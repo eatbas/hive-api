@@ -80,6 +80,23 @@ class WarmWorker:
         await self.queue.put((request, handle))
         return handle
 
+    async def run_quick_command(self, script: str, timeout: float | None = None) -> tuple[int, str]:
+        """Run a short command on this worker's shell, returning (exit_code, output).
+
+        Only safe to call when the worker is idle (not busy, empty queue).
+        """
+        lines: list[str] = []
+
+        async def collect(line: str) -> None:
+            lines.append(line)
+
+        coro = self.shell.run_script(script, collect)
+        if timeout is not None:
+            exit_code = await asyncio.wait_for(coro, timeout=timeout)
+        else:
+            exit_code = await coro
+        return exit_code, "\n".join(lines)
+
     def info(self) -> WorkerInfo:
         return WorkerInfo(
             provider=self.provider,
@@ -276,6 +293,32 @@ class WorkerManager:
 
     def worker_info(self) -> list[WorkerInfo]:
         return [worker.info() for worker in self.workers.values()]
+
+    def workers_for_provider(self, provider: ProviderName) -> list[WarmWorker]:
+        return [w for (p, _), w in self.workers.items() if p == provider]
+
+    async def restart_provider(self, provider: ProviderName) -> None:
+        for worker in self.workers_for_provider(provider):
+            await worker.stop()
+            await worker.start()
+
+    def get_idle_worker(self, provider: ProviderName) -> WarmWorker | None:
+        """Return the first idle, ready worker for *provider*, or None."""
+        for worker in self.workers_for_provider(provider):
+            if worker.ready and not worker.busy and worker.queue.qsize() == 0:
+                return worker
+        return None
+
+    async def get_bash_version(self) -> str | None:
+        """Get the bash version using any available idle worker shell."""
+        for worker in self.workers.values():
+            if worker.ready and not worker.busy and worker.queue.qsize() == 0:
+                try:
+                    _, output = await worker.run_quick_command("bash --version | head -1\n__ai_cli_exit=0")
+                    return output.strip() if output.strip() else None
+                except Exception:
+                    return None
+        return None
 
     def health_details(self) -> list[str]:
         details: list[str] = []

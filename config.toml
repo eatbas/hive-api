@@ -29,3 +29,8 @@ enabled = true
 executable = ""
 models = ["kimi-code/kimi-for-coding"]
 default_options = { extra_args = [] }
+
+[updater]
+enabled = true
+interval_hours = 4
+auto_update = true

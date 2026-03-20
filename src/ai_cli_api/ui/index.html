@@ -279,6 +279,119 @@
       color: var(--error);
     }
 
+    .version-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+      gap: 12px;
+    }
+
+    .version-card {
+      background: var(--panel-strong);
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      padding: 14px 16px;
+      display: grid;
+      gap: 8px;
+    }
+
+    .version-card.outdated {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 2px rgba(208, 90, 45, 0.10);
+    }
+
+    .version-card-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .version-card-header strong {
+      font-size: 1rem;
+      color: var(--accent);
+      text-transform: capitalize;
+    }
+
+    .version-badge {
+      font-size: 0.75rem;
+      font-weight: 700;
+      padding: 3px 10px;
+      border-radius: 999px;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    .version-badge.up-to-date {
+      background: rgba(15, 118, 110, 0.12);
+      color: var(--ok);
+    }
+
+    .version-badge.update-available {
+      background: rgba(208, 90, 45, 0.12);
+      color: var(--accent);
+    }
+
+    .version-badge.unknown {
+      background: rgba(107, 98, 88, 0.12);
+      color: var(--muted);
+    }
+
+    .version-row {
+      display: flex;
+      justify-content: space-between;
+      font-size: 0.88rem;
+    }
+
+    .version-row span:first-child {
+      color: var(--muted);
+    }
+
+    .version-row span:last-child {
+      font-weight: 600;
+      font-family: Consolas, "SFMono-Regular", monospace;
+    }
+
+    .version-skip {
+      font-size: 0.78rem;
+      color: var(--muted);
+      font-style: italic;
+    }
+
+    .version-actions {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 12px;
+    }
+
+    .version-actions .meta {
+      margin: 0;
+    }
+
+    .version-update-btn {
+      padding: 6px 14px;
+      font-size: 0.82rem;
+      background: linear-gradient(135deg, #d05a2d, #e88c46);
+      color: white;
+      box-shadow: 0 4px 12px rgba(208, 90, 45, 0.18);
+    }
+
+    .version-update-btn:disabled {
+      background: #ccc;
+      box-shadow: none;
+    }
+
+    .version-card-footer {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+    }
+
+    .version-card-footer .meta {
+      font-size: 0.78rem;
+      margin: 0;
+    }
+
     @keyframes rise {
       from {
         opacity: 0;
@@ -330,6 +443,10 @@
         <div class="stat">
           <span class="stat-label">Shell</span>
           <span class="stat-value" id="shell-path">Loading…</span>
+        </div>
+        <div class="stat">
+          <span class="stat-label">Bash Version</span>
+          <span class="stat-value" id="bash-version">Loading…</span>
         </div>
         <div class="stat">
           <span class="stat-label">Workers</span>
@@ -409,6 +526,15 @@
         </div>
       </div>
     </section>
+
+    <section class="panel">
+      <h2>CLI Versions</h2>
+      <div class="version-actions">
+        <button class="secondary" id="check-updates-button" type="button">Check for Updates</button>
+        <span class="meta" id="version-meta">Not checked yet.</span>
+      </div>
+      <div class="version-grid" id="version-grid"></div>
+    </section>
   </main>
 
   <script>
@@ -425,11 +551,15 @@
     const eventCountEl = document.getElementById("event-count");
     const healthStatusEl = document.getElementById("health-status");
     const shellPathEl = document.getElementById("shell-path");
+    const bashVersionEl = document.getElementById("bash-version");
     const workerCountEl = document.getElementById("worker-count");
     const workerListEl = document.getElementById("worker-list");
     const requestMetaEl = document.getElementById("request-meta");
     const sendButton = document.getElementById("send-button");
     const refreshButton = document.getElementById("refresh-button");
+    const checkUpdatesButton = document.getElementById("check-updates-button");
+    const versionGridEl = document.getElementById("version-grid");
+    const versionMetaEl = document.getElementById("version-meta");
 
     let workers = [];
     let eventCount = 0;
@@ -484,6 +614,102 @@
       }
     }
 
+    function renderVersions(versions) {
+      versionGridEl.innerHTML = "";
+      if (!versions.length) {
+        versionGridEl.innerHTML = '<span class="meta">No version data yet. Click "Check for Updates".</span>';
+        return;
+      }
+      for (const v of versions) {
+        const card = document.createElement("div");
+        const outdated = v.needs_update;
+        const unknown = !v.current_version && !v.latest_version;
+        card.className = `version-card${outdated ? " outdated" : ""}`;
+
+        let badgeClass = "up-to-date";
+        let badgeText = "Up to date";
+        if (unknown) {
+          badgeClass = "unknown";
+          badgeText = "Unknown";
+        } else if (outdated) {
+          badgeClass = "update-available";
+          badgeText = "Update available";
+        }
+
+        let skipHtml = "";
+        if (v.update_skipped_reason) {
+          skipHtml = `<div class="version-skip">Skipped: ${v.update_skipped_reason}</div>`;
+        }
+
+        card.innerHTML = `
+          <div class="version-card-header">
+            <strong>${v.provider}</strong>
+            <span class="version-badge ${badgeClass}">${badgeText}</span>
+          </div>
+          <div class="version-row">
+            <span>Installed</span>
+            <span>${v.current_version || "—"}</span>
+          </div>
+          <div class="version-row">
+            <span>Latest</span>
+            <span>${v.latest_version || "—"}</span>
+          </div>
+          <div class="version-row">
+            <span>Next check</span>
+            <span>${v.next_check_at ? new Date(v.next_check_at).toLocaleTimeString() : "—"}</span>
+          </div>
+          <div class="version-row">
+            <span>Auto-update</span>
+            <span>${v.auto_update ? "Enabled" : "Disabled"}</span>
+          </div>
+          ${skipHtml}
+          <div class="version-card-footer">
+            <button class="version-update-btn" data-provider="${v.provider}" ${!outdated && !unknown ? "disabled" : ""}>${!outdated && !unknown ? "Already updated" : "Update"}</button>
+            <span class="meta" data-update-status="${v.provider}"></span>
+          </div>
+        `;
+        versionGridEl.appendChild(card);
+      }
+
+      // Bind per-card update buttons
+      for (const btn of versionGridEl.querySelectorAll(".version-update-btn")) {
+        btn.addEventListener("click", () => updateProvider(btn.dataset.provider, btn));
+      }
+    }
+
+    async function updateProvider(provider, btn) {
+      btn.disabled = true;
+      const statusEl = versionGridEl.querySelector(`[data-update-status="${provider}"]`);
+      if (statusEl) statusEl.textContent = "Updating…";
+      try {
+        const response = await fetch(`/v1/cli-versions/${provider}/update`, { method: "POST" });
+        const result = await response.json();
+        if (!response.ok) {
+          throw new Error(result.detail || "Update failed");
+        }
+        if (statusEl) {
+          statusEl.textContent = result.last_updated ? "Updated!" : (result.update_skipped_reason || "Done");
+        }
+        // Refresh all version cards with fresh data
+        const all = await fetchVersions();
+        renderVersions(all);
+      } catch (error) {
+        if (statusEl) statusEl.textContent = error.message;
+      } finally {
+        btn.disabled = false;
+      }
+    }
+
+    async function fetchVersions() {
+      const response = await fetch("/v1/cli-versions");
+      return await response.json();
+    }
+
+    async function checkForUpdates() {
+      const response = await fetch("/v1/cli-versions/check", { method: "POST" });
+      return await response.json();
+    }
+
     async function refreshState() {
       const [healthResponse, workersResponse, providersResponse] = await Promise.all([
         fetch("/health"),
@@ -498,6 +724,7 @@
       healthStatusEl.textContent = health.status;
       healthStatusEl.className = `stat-value ${health.status === "ok" ? "ok" : "error"}`;
       shellPathEl.textContent = health.shell_path || "not detected";
+      bashVersionEl.textContent = health.bash_version || "not detected";
       workerCountEl.textContent = String(health.worker_count);
 
       const savedProvider = providerSelect.value;
@@ -522,6 +749,17 @@
       }
       renderWorkers();
       updateSessionVisibility();
+
+      try {
+        const versions = await fetchVersions();
+        renderVersions(versions);
+        if (versions.length) {
+          const lastChecked = versions[0].last_checked;
+          versionMetaEl.textContent = lastChecked
+            ? `Last checked: ${new Date(lastChecked).toLocaleString()}`
+            : "Checked.";
+        }
+      } catch (_) { /* version endpoint may not have data yet */ }
     }
 
     function parseSseChunk(buffer) {
@@ -638,6 +876,23 @@
         setMeta(error.message, true);
       } finally {
         refreshButton.disabled = false;
+      }
+    });
+
+    checkUpdatesButton.addEventListener("click", async () => {
+      checkUpdatesButton.disabled = true;
+      versionMetaEl.textContent = "Checking…";
+      try {
+        const versions = await checkForUpdates();
+        renderVersions(versions);
+        const lastChecked = versions.length && versions[0].last_checked;
+        versionMetaEl.textContent = lastChecked
+          ? `Last checked: ${new Date(lastChecked).toLocaleString()}`
+          : "Done.";
+      } catch (error) {
+        versionMetaEl.textContent = error.message;
+      } finally {
+        checkUpdatesButton.disabled = false;
       }
     });
 

@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 import json
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -13,11 +11,14 @@ from .config import load_config
 from .models import (
     ChatRequest,
     ChatResponse,
+    CLIVersionStatus,
     ErrorDetail,
     HealthResponse,
     ProviderCapability,
+    ProviderName,
     WorkerInfo,
 )
+from .updater import CLIUpdater
 from .worker import WorkerManager
 
 UI_INDEX = Path(__file__).with_name("ui") / "index.html"
@@ -79,6 +80,10 @@ OPENAPI_TAGS = [
         "description": "Submit prompts to AI providers. Supports streaming (SSE) and synchronous JSON responses.",
     },
     {
+        "name": "Updates",
+        "description": "CLI version checking and auto-update management.",
+    },
+    {
         "name": "Console",
         "description": "Built-in browser UI for testing the API interactively.",
     },
@@ -98,13 +103,16 @@ async def _stream_handle_events(handle) -> AsyncIterator[str]:
 def create_app() -> FastAPI:
     config = load_config()
     manager = WorkerManager(config)
+    updater = CLIUpdater(manager=manager, config=config.updater)
 
     @asynccontextmanager
     async def lifespan(_: FastAPI):
         await manager.start()
+        updater.start()
         try:
             yield
         finally:
+            await updater.stop()
             await manager.stop()
 
     app = FastAPI(
@@ -123,6 +131,7 @@ def create_app() -> FastAPI:
     )
     app.state.config = config
     app.state.worker_manager = manager
+    app.state.updater = updater
 
     # ------------------------------------------------------------------
     # Routes
@@ -151,10 +160,12 @@ def create_app() -> FastAPI:
     )
     async def health() -> HealthResponse:
         details = manager.health_details()
+        bash_version = await manager.get_bash_version()
         return HealthResponse(
             status="ok" if not details else "degraded",
             config_path=str(config.config_path),
             shell_path=manager.shell_path,
+            bash_version=bash_version,
             workers_booted=all(worker.ready for worker in manager.workers.values()) if manager.workers else False,
             worker_count=len(manager.workers),
             details=details,
@@ -252,5 +263,53 @@ Check `GET /v1/providers` for the `supports_resume` flag before attempting to re
         except Exception as exc:
             raise HTTPException(status_code=500, detail=str(exc)) from exc
         return JSONResponse(content=result.model_dump())
+
+    @app.get(
+        "/v1/cli-versions",
+        tags=["Updates"],
+        summary="List CLI version statuses",
+        description=(
+            "Returns the cached version status for each enabled CLI provider from the "
+            "most recent periodic check. Includes current version, latest available "
+            "version, and whether an update is needed."
+        ),
+        response_model=list[CLIVersionStatus],
+    )
+    async def cli_versions() -> list[CLIVersionStatus]:
+        return updater.last_results
+
+    @app.post(
+        "/v1/cli-versions/check",
+        tags=["Updates"],
+        summary="Trigger an immediate version check",
+        description=(
+            "Runs a full version check cycle now, comparing installed CLI versions "
+            "against the latest published versions and auto-updating idle providers "
+            "if auto_update is enabled. Returns the results."
+        ),
+        response_model=list[CLIVersionStatus],
+    )
+    async def cli_versions_check() -> list[CLIVersionStatus]:
+        return await updater.check_and_update_all()
+
+    @app.post(
+        "/v1/cli-versions/{provider}/update",
+        tags=["Updates"],
+        summary="Force-update a single CLI provider",
+        description=(
+            "Triggers an immediate update for the specified provider CLI, "
+            "regardless of the auto_update setting. The provider's workers "
+            "must be idle; returns the updated version status."
+        ),
+        response_model=CLIVersionStatus,
+        responses={
+            404: {
+                "description": "Unknown provider name.",
+                "model": ErrorDetail,
+            },
+        },
+    )
+    async def cli_version_update(provider: ProviderName) -> CLIVersionStatus:
+        return await updater.update_single_provider(provider)
 
     return app

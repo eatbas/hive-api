@@ -29,10 +29,18 @@ class ProviderConfig:
 
 
 @dataclass(slots=True)
+class UpdaterConfig:
+    enabled: bool = True
+    interval_hours: float = 4.0
+    auto_update: bool = True
+
+
+@dataclass(slots=True)
 class AppConfig:
     server: ServerConfig
     shell: ShellConfig
     providers: dict[ProviderName, ProviderConfig]
+    updater: UpdaterConfig
     config_path: Path
 
 
@@ -69,6 +77,7 @@ def load_config(path: str | os.PathLike[str] | None = None) -> AppConfig:
 
     server = raw.get("server", {})
     shell = raw.get("shell", {})
+    updater = raw.get("updater", {})
 
     return AppConfig(
         server=ServerConfig(
@@ -79,5 +88,10 @@ def load_config(path: str | os.PathLike[str] | None = None) -> AppConfig:
             path=(str(shell["path"]).strip() or None) if shell.get("path") is not None else None,
         ),
         providers=_default_provider_map(raw),
+        updater=UpdaterConfig(
+            enabled=bool(updater.get("enabled", True)),
+            interval_hours=float(updater.get("interval_hours", 4.0)),
+            auto_update=bool(updater.get("auto_update", True)),
+        ),
         config_path=config_path,
     )

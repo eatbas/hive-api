@@ -206,6 +206,7 @@ class HealthResponse(BaseModel):
     status: Literal["ok", "degraded"] = Field(description="Overall health status.")
     config_path: str = Field(description="Filesystem path to the loaded configuration file.")
     shell_path: str | None = Field(description="Resolved shell executable path, or null if auto-detection failed.")
+    bash_version: str | None = Field(default=None, description="Git Bash / bash version string, or null if not yet detected.")
     workers_booted: bool = Field(description="True if all configured workers have started successfully.")
     worker_count: int = Field(description="Total number of configured workers.")
     details: list[str] = Field(default_factory=list, description="Error messages from unhealthy workers. Empty when status is 'ok'.")
@@ -217,9 +218,48 @@ class HealthResponse(BaseModel):
                     "status": "ok",
                     "config_path": "/home/user/ai-cli-api/config.toml",
                     "shell_path": "/usr/bin/bash",
+                    "bash_version": "GNU bash, version 5.2.26(1)-release (x86_64-pc-msys)",
                     "workers_booted": True,
                     "worker_count": 7,
                     "details": [],
+                }
+            ]
+        }
+    )
+
+
+# ---------------------------------------------------------------------------
+# CLI version / update status
+# ---------------------------------------------------------------------------
+
+class CLIVersionStatus(BaseModel):
+    """Version and update status for a CLI provider executable."""
+
+    provider: ProviderName = Field(description="Provider this status applies to.")
+    executable: str | None = Field(description="Resolved CLI executable path, or null if not found.")
+    current_version: str | None = Field(description="Currently installed version, or null if detection failed.")
+    latest_version: str | None = Field(description="Latest available version from the package registry, or null if lookup failed.")
+    needs_update: bool = Field(description="True when the installed version is older than the latest available version.")
+    last_checked: str | None = Field(default=None, description="ISO-8601 timestamp of the most recent version check.")
+    next_check_at: str | None = Field(default=None, description="ISO-8601 timestamp of the next scheduled version check.")
+    auto_update: bool = Field(default=True, description="Whether auto-update is enabled for this check cycle.")
+    last_updated: str | None = Field(default=None, description="ISO-8601 timestamp of the most recent successful update, or null if never updated.")
+    update_skipped_reason: str | None = Field(default=None, description="Reason the update was skipped (e.g. 'workers busy'), or null if not applicable.")
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "examples": [
+                {
+                    "provider": "claude",
+                    "executable": "claude",
+                    "current_version": "1.0.16",
+                    "latest_version": "1.0.17",
+                    "needs_update": True,
+                    "last_checked": "2026-03-21T12:00:00Z",
+                    "next_check_at": "2026-03-21T16:00:00Z",
+                    "auto_update": True,
+                    "last_updated": None,
+                    "update_skipped_reason": "workers busy",
                 }
             ]
         }
