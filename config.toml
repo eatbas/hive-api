@@ -1,0 +1,31 @@
+[server]
+host = "127.0.0.1"
+port = 8000
+
+[shell]
+# On Windows the app prefers Git Bash automatically when this is empty.
+path = ""
+
+[providers.gemini]
+enabled = true
+executable = ""
+models = ["gemini-3.1-pro-preview", "gemini-3-flash-preview"]
+default_options = { extra_args = [] }
+
+[providers.codex]
+enabled = true
+executable = ""
+models = ["codex-5.3", "gpt-5.4", "gpt-5.4-mini"]
+default_options = { extra_args = [] }
+
+[providers.claude]
+enabled = true
+executable = ""
+models = ["opus", "sonnet", "haiku"]
+default_options = { extra_args = [] }
+
+[providers.kimi]
+enabled = true
+executable = ""
+models = ["kimi-code/kimi-for-coding"]
+default_options = { extra_args = [] }

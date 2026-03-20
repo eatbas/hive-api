@@ -1,0 +1,657 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>AI CLI API Console</title>
+  <style>
+    :root {
+      --bg: #f3efe6;
+      --panel: rgba(255, 251, 245, 0.92);
+      --panel-strong: #fffdf8;
+      --ink: #1c1a17;
+      --muted: #6b6258;
+      --line: rgba(28, 26, 23, 0.12);
+      --accent: #d05a2d;
+      --accent-soft: #f6c7a8;
+      --ok: #0f766e;
+      --error: #b42318;
+      --shadow: 0 24px 60px rgba(84, 56, 26, 0.14);
+      --radius: 20px;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: "IBM Plex Sans", "Segoe UI", sans-serif;
+      color: var(--ink);
+      background:
+        radial-gradient(circle at top left, rgba(208, 90, 45, 0.18), transparent 30%),
+        radial-gradient(circle at top right, rgba(15, 118, 110, 0.16), transparent 28%),
+        linear-gradient(180deg, #fbf7ef 0%, #efe7d7 100%);
+    }
+
+    .shell {
+      width: min(1200px, calc(100vw - 32px));
+      margin: 24px auto;
+      display: grid;
+      gap: 18px;
+      animation: rise 300ms ease-out;
+    }
+
+    .hero,
+    .panel {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      backdrop-filter: blur(12px);
+    }
+
+    .hero {
+      padding: 28px;
+      display: grid;
+      gap: 12px;
+    }
+
+    .eyebrow {
+      color: var(--accent);
+      font-size: 0.86rem;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      font-weight: 700;
+    }
+
+    h1 {
+      margin: 0;
+      font-family: Georgia, "Times New Roman", serif;
+      font-size: clamp(1.5rem, 4vw, 2.5rem);
+      line-height: 0.95;
+      white-space: nowrap;
+    }
+
+    .hero p {
+      margin: 0;
+      color: var(--muted);
+      font-size: 1rem;
+      line-height: 1.5;
+      white-space: nowrap;
+    }
+
+    .status-strip {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+      gap: 12px;
+    }
+
+    .stat {
+      background: var(--panel-strong);
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      padding: 14px 16px;
+    }
+
+    .stat-label {
+      display: block;
+      color: var(--muted);
+      font-size: 0.8rem;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      margin-bottom: 6px;
+    }
+
+    .stat-value {
+      font-size: 1.15rem;
+      font-weight: 700;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: 420px minmax(0, 1fr);
+      gap: 18px;
+    }
+
+    .panel {
+      padding: 20px;
+    }
+
+    .panel h2 {
+      margin: 0 0 14px;
+      font-size: 1rem;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+
+    .form {
+      display: grid;
+      gap: 14px;
+    }
+
+    .row {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 12px;
+    }
+
+    .field {
+      display: grid;
+      gap: 6px;
+    }
+
+    label {
+      color: var(--muted);
+      font-size: 0.9rem;
+      font-weight: 600;
+    }
+
+    input,
+    select,
+    textarea,
+    button {
+      font: inherit;
+    }
+
+    input,
+    select,
+    textarea {
+      width: 100%;
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      background: var(--panel-strong);
+      color: var(--ink);
+      padding: 12px 14px;
+      transition: border-color 160ms ease, transform 160ms ease, box-shadow 160ms ease;
+    }
+
+    textarea {
+      min-height: 150px;
+      resize: vertical;
+      line-height: 1.45;
+    }
+
+    input:focus,
+    select:focus,
+    textarea:focus {
+      outline: none;
+      border-color: var(--accent);
+      box-shadow: 0 0 0 4px rgba(208, 90, 45, 0.12);
+      transform: translateY(-1px);
+    }
+
+    .toggle {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 12px 14px;
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      background: var(--panel-strong);
+    }
+
+    .actions {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    button {
+      border: 0;
+      border-radius: 999px;
+      padding: 12px 18px;
+      cursor: pointer;
+      transition: transform 160ms ease, opacity 160ms ease, box-shadow 160ms ease;
+    }
+
+    button:hover {
+      transform: translateY(-1px);
+    }
+
+    button:disabled {
+      opacity: 0.55;
+      cursor: not-allowed;
+      transform: none;
+    }
+
+    .primary {
+      background: linear-gradient(135deg, #d05a2d, #e88c46);
+      color: white;
+      box-shadow: 0 12px 24px rgba(208, 90, 45, 0.22);
+    }
+
+    .secondary {
+      background: #ece3d3;
+      color: var(--ink);
+    }
+
+    .meta {
+      color: var(--muted);
+      font-size: 0.9rem;
+    }
+
+    .response-card {
+      display: grid;
+      gap: 14px;
+      height: 100%;
+    }
+
+    .console {
+      min-height: 360px;
+      border-radius: 18px;
+      background: #17181c;
+      color: #f4efe7;
+      padding: 18px;
+      font-family: Consolas, "SFMono-Regular", monospace;
+      line-height: 1.45;
+      white-space: pre-wrap;
+      overflow: auto;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+    }
+
+    .pill-row,
+    .worker-list {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+
+    .pill,
+    .worker-chip {
+      border-radius: 999px;
+      padding: 8px 12px;
+      background: var(--panel-strong);
+      border: 1px solid var(--line);
+      font-size: 0.9rem;
+    }
+
+    .worker-chip strong {
+      color: var(--accent);
+    }
+
+    .ok {
+      color: var(--ok);
+    }
+
+    .error {
+      color: var(--error);
+    }
+
+    @keyframes rise {
+      from {
+        opacity: 0;
+        transform: translateY(10px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    @media (max-width: 980px) {
+      .grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    @media (max-width: 640px) {
+      .shell {
+        width: min(100vw - 16px, 100%);
+        margin: 8px auto 24px;
+      }
+
+      .hero,
+      .panel {
+        padding: 16px;
+      }
+
+      .row {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main class="shell">
+    <section class="hero">
+      <span class="eyebrow">Warm Worker Console</span>
+      <h1>Probe every CLI without leaving the browser.</h1>
+      <p>
+        This page talks directly to your local API wrapper, shows warm worker state,
+        and lets you send new or resumed requests with either JSON mode or streamed SSE output.
+      </p>
+      <div class="status-strip">
+        <div class="stat">
+          <span class="stat-label">API Status</span>
+          <span class="stat-value" id="health-status">Loading…</span>
+        </div>
+        <div class="stat">
+          <span class="stat-label">Shell</span>
+          <span class="stat-value" id="shell-path">Loading…</span>
+        </div>
+        <div class="stat">
+          <span class="stat-label">Workers</span>
+          <span class="stat-value" id="worker-count">0</span>
+        </div>
+      </div>
+    </section>
+
+    <section class="grid">
+      <div class="panel">
+        <h2>Request</h2>
+        <form class="form" id="chat-form">
+          <div class="row">
+            <div class="field">
+              <label for="provider">Provider</label>
+              <select id="provider" name="provider"></select>
+            </div>
+            <div class="field">
+              <label for="model">Model</label>
+              <select id="model" name="model"></select>
+            </div>
+          </div>
+
+          <div class="row">
+            <div class="field">
+              <label for="mode">Mode</label>
+              <select id="mode" name="mode">
+                <option value="new">new</option>
+                <option value="resume">resume</option>
+              </select>
+            </div>
+            <div class="field">
+              <label for="stream">Response Mode</label>
+              <div class="toggle">
+                <input id="stream" name="stream" type="checkbox" checked>
+                <span>Stream with SSE parser</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="field">
+            <label for="workspace_path">Workspace Path</label>
+            <input id="workspace_path" name="workspace_path" type="text" value="C:\\Github\\ai-cli-api" placeholder="C:\\Github\\ai-cli-api">
+          </div>
+
+          <div class="field" id="session-row">
+            <label for="provider_session_ref">Provider Session Ref</label>
+            <input id="provider_session_ref" name="provider_session_ref" type="text" placeholder="Required for resume mode">
+          </div>
+
+          <div class="field">
+            <label for="prompt">Prompt</label>
+            <textarea id="prompt" name="prompt" placeholder="Ask the selected CLI something simple first."></textarea>
+          </div>
+
+          <div class="actions">
+            <button class="primary" id="send-button" type="submit">Send Request</button>
+            <button class="secondary" id="refresh-button" type="button">Refresh Worker State</button>
+          </div>
+
+          <div class="meta" id="request-meta">Ready.</div>
+        </form>
+      </div>
+
+      <div class="panel response-card">
+        <div>
+          <h2>Response</h2>
+          <div class="pill-row">
+            <span class="pill">stream events: <strong id="event-count">0</strong></span>
+            <span class="pill">current session: <strong id="session-ref">none</strong></span>
+          </div>
+        </div>
+        <div class="console" id="console"></div>
+        <div>
+          <h2>Warm Workers</h2>
+          <div class="worker-list" id="worker-list"></div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <script>
+    const form = document.getElementById("chat-form");
+    const providerSelect = document.getElementById("provider");
+    const modelSelect = document.getElementById("model");
+    const modeSelect = document.getElementById("mode");
+    const sessionInput = document.getElementById("provider_session_ref");
+    const workspaceInput = document.getElementById("workspace_path");
+    const promptInput = document.getElementById("prompt");
+    const streamInput = document.getElementById("stream");
+    const consoleEl = document.getElementById("console");
+    const sessionRefEl = document.getElementById("session-ref");
+    const eventCountEl = document.getElementById("event-count");
+    const healthStatusEl = document.getElementById("health-status");
+    const shellPathEl = document.getElementById("shell-path");
+    const workerCountEl = document.getElementById("worker-count");
+    const workerListEl = document.getElementById("worker-list");
+    const requestMetaEl = document.getElementById("request-meta");
+    const sendButton = document.getElementById("send-button");
+    const refreshButton = document.getElementById("refresh-button");
+
+    let workers = [];
+    let eventCount = 0;
+
+    function writeConsole(line = "") {
+      consoleEl.textContent += line + "\n";
+      consoleEl.scrollTop = consoleEl.scrollHeight;
+    }
+
+    function resetConsole() {
+      consoleEl.textContent = "";
+      eventCount = 0;
+      eventCountEl.textContent = "0";
+      sessionRefEl.textContent = "none";
+    }
+
+    function setMeta(message, isError = false) {
+      requestMetaEl.textContent = message;
+      requestMetaEl.className = isError ? "meta error" : "meta";
+    }
+
+    function updateSessionVisibility() {
+      sessionInput.disabled = modeSelect.value !== "resume";
+      sessionInput.parentElement.style.opacity = modeSelect.value === "resume" ? "1" : "0.55";
+    }
+
+    function modelsForProvider(provider) {
+      return workers
+        .filter((worker) => worker.provider === provider)
+        .map((worker) => worker.model);
+    }
+
+    function renderModelOptions() {
+      const current = providerSelect.value;
+      const models = modelsForProvider(current);
+      modelSelect.innerHTML = "";
+      for (const model of models) {
+        const option = document.createElement("option");
+        option.value = model;
+        option.textContent = model;
+        modelSelect.appendChild(option);
+      }
+    }
+
+    function renderWorkers() {
+      workerListEl.innerHTML = "";
+      for (const worker of workers) {
+        const chip = document.createElement("div");
+        chip.className = "worker-chip";
+        chip.innerHTML = `<strong>${worker.provider}/${worker.model}</strong> · ${worker.ready ? "ready" : "down"} · ${worker.busy ? "busy" : "idle"} · q=${worker.queue_length}`;
+        workerListEl.appendChild(chip);
+      }
+    }
+
+    async function refreshState() {
+      const [healthResponse, workersResponse, providersResponse] = await Promise.all([
+        fetch("/health"),
+        fetch("/v1/workers"),
+        fetch("/v1/providers")
+      ]);
+
+      const health = await healthResponse.json();
+      workers = await workersResponse.json();
+      const providers = await providersResponse.json();
+
+      healthStatusEl.textContent = health.status;
+      healthStatusEl.className = `stat-value ${health.status === "ok" ? "ok" : "error"}`;
+      shellPathEl.textContent = health.shell_path || "not detected";
+      workerCountEl.textContent = String(health.worker_count);
+
+      const savedProvider = providerSelect.value;
+      const savedModel = modelSelect.value;
+
+      providerSelect.innerHTML = "";
+      for (const provider of providers.filter((item) => item.enabled)) {
+        const option = document.createElement("option");
+        option.value = provider.provider;
+        option.textContent = provider.provider;
+        providerSelect.appendChild(option);
+      }
+
+      if (savedProvider) {
+        providerSelect.value = savedProvider;
+      }
+
+      renderModelOptions();
+
+      if (savedModel) {
+        modelSelect.value = savedModel;
+      }
+      renderWorkers();
+      updateSessionVisibility();
+    }
+
+    function parseSseChunk(buffer) {
+      const packets = buffer.split("\n\n");
+      return {
+        packets: packets.slice(0, -1),
+        remainder: packets[packets.length - 1] || ""
+      };
+    }
+
+    async function sendStreaming(payload) {
+      const response = await fetch("/v1/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+      });
+      if (!response.ok || !response.body) {
+        const message = await response.text();
+        throw new Error(message || `HTTP ${response.status}`);
+      }
+
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = "";
+
+      while (true) {
+        const { value, done } = await reader.read();
+        if (done) {
+          break;
+        }
+        buffer += decoder.decode(value, { stream: true });
+        const parsed = parseSseChunk(buffer);
+        buffer = parsed.remainder;
+
+        for (const packet of parsed.packets) {
+          const lines = packet.split("\n");
+          const eventLine = lines.find((line) => line.startsWith("event: "));
+          const dataLine = lines.find((line) => line.startsWith("data: "));
+          if (!eventLine || !dataLine) {
+            continue;
+          }
+          const eventName = eventLine.slice(7).trim();
+          const payload = JSON.parse(dataLine.slice(6));
+          eventCount += 1;
+          eventCountEl.textContent = String(eventCount);
+          writeConsole(`[${eventName}] ${JSON.stringify(payload, null, 2)}`);
+          if (payload.provider_session_ref) {
+            sessionRefEl.textContent = payload.provider_session_ref;
+            sessionInput.value = payload.provider_session_ref;
+          }
+        }
+      }
+    }
+
+    async function sendJson(payload) {
+      const response = await fetch("/v1/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+      });
+      const body = await response.json();
+      if (!response.ok) {
+        throw new Error(body.detail || JSON.stringify(body));
+      }
+      writeConsole(JSON.stringify(body, null, 2));
+      if (body.provider_session_ref) {
+        sessionRefEl.textContent = body.provider_session_ref;
+        sessionInput.value = body.provider_session_ref;
+      }
+    }
+
+    form.addEventListener("submit", async (event) => {
+      event.preventDefault();
+      resetConsole();
+      sendButton.disabled = true;
+      setMeta("Sending request…");
+
+      const payload = {
+        provider: providerSelect.value,
+        model: modelSelect.value,
+        workspace_path: workspaceInput.value.trim(),
+        mode: modeSelect.value,
+        prompt: promptInput.value,
+        stream: streamInput.checked
+      };
+
+      if (payload.mode === "resume") {
+        payload.provider_session_ref = sessionInput.value.trim();
+      }
+
+      try {
+        sessionStorage.setItem("workspace_path", payload.workspace_path);
+        if (payload.stream) {
+          await sendStreaming(payload);
+        } else {
+          await sendJson(payload);
+        }
+        setMeta("Request completed.");
+        await refreshState();
+      } catch (error) {
+        writeConsole(`[failed] ${error.message}`);
+        setMeta(error.message, true);
+      } finally {
+        sendButton.disabled = false;
+      }
+    });
+
+    refreshButton.addEventListener("click", async () => {
+      refreshButton.disabled = true;
+      try {
+        await refreshState();
+        setMeta("State refreshed.");
+      } catch (error) {
+        setMeta(error.message, true);
+      } finally {
+        refreshButton.disabled = false;
+      }
+    });
+
+    providerSelect.addEventListener("change", renderModelOptions);
+    modeSelect.addEventListener("change", updateSessionVisibility);
+
+    window.addEventListener("load", async () => {
+      workspaceInput.value = sessionStorage.getItem("workspace_path") || workspaceInput.defaultValue;
+      try {
+        await refreshState();
+      } catch (error) {
+        setMeta(error.message, true);
+      }
+    });
+  </script>
+</body>
+</html>
