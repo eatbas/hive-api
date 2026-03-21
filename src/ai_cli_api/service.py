@@ -16,6 +16,7 @@ from .models import (
     CLIVersionStatus,
     ErrorDetail,
     HealthResponse,
+    ModelDetail,
     ProviderCapability,
     ProviderName,
     TestGenerateRequest,
@@ -41,6 +42,9 @@ overhead.
 ## Key Concepts
 
 - **Providers** — Supported AI CLIs: `gemini`, `codex`, `claude`, `kimi`, `copilot`.
+- **Models** — Each provider exposes one or more models (e.g. `copilot` offers
+  `claude-sonnet-4.6`, `gpt-5.4`, `gemini-3-flash-preview`, etc.).
+  Use `GET /v1/models` to discover all available models with ready-to-use chat examples.
 - **Workers** — Long-lived bash processes, one per provider/model pair,
   ready to execute prompts immediately.
 - **Sessions** — Some providers support resuming previous conversations via
@@ -88,6 +92,13 @@ OPENAPI_TAGS = [
     {
         "name": "Providers",
         "description": "Query registered AI CLI providers and their capabilities.",
+    },
+    {
+        "name": "Models",
+        "description": (
+            "Discover all supported models across providers. Each model entry includes "
+            "its provider, readiness state, and a ready-to-use `POST /v1/chat` example request."
+        ),
     },
     {
         "name": "Workers",
@@ -215,6 +226,23 @@ def create_app() -> FastAPI:
     )
     async def providers() -> list[ProviderCapability]:
         return manager.capabilities()
+
+    @app.get(
+        "/v1/models",
+        tags=["Models"],
+        summary="List all supported models with chat examples",
+        description=(
+            "Returns every configured model across all providers, along with its "
+            "current readiness state and a ready-to-use example request body for "
+            "`POST /v1/chat`.\n\n"
+            "Use this endpoint to discover which models are available and how to "
+            "call them. Copy the `chat_request_example` object, replace the "
+            "`prompt` and `workspace_path` fields, and POST it to `/v1/chat`."
+        ),
+        response_model=list[ModelDetail],
+    )
+    async def models() -> list[ModelDetail]:
+        return manager.model_details()
 
     @app.get(
         "/v1/workers",

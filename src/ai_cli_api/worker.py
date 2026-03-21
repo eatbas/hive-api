@@ -5,7 +5,7 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from .config import AppConfig, ProviderConfig
-from .models import ChatRequest, ChatResponse, ProviderCapability, ProviderName, WorkerInfo
+from .models import ChatRequest, ChatResponse, ModelDetail, ProviderCapability, ProviderName, WorkerInfo
 from .providers.base import ParseState, ProviderAdapter
 from .providers.registry import build_provider_registry
 from .shells import BashSession, ShellSessionError, detect_bash_path
@@ -283,6 +283,7 @@ class WorkerManager:
                     provider=provider,
                     executable=adapter.resolve_executable(provider_config.executable),
                     enabled=provider_config.enabled,
+                    models=provider_config.models,
                     supports_resume=adapter.supports_resume,
                     supports_streaming=adapter.supports_streaming,
                     supports_model_override=adapter.supports_model_override,
@@ -290,6 +291,30 @@ class WorkerManager:
                 )
             )
         return capabilities
+
+    def model_details(self) -> list[ModelDetail]:
+        """Return detailed info for every configured model, including a chat example."""
+        details: list[ModelDetail] = []
+        for (provider, model), worker in self.workers.items():
+            adapter = self.registry[provider]
+            details.append(
+                ModelDetail(
+                    provider=provider,
+                    model=model,
+                    ready=worker.ready,
+                    busy=worker.busy,
+                    supports_resume=adapter.supports_resume,
+                    chat_request_example={
+                        "provider": provider.value,
+                        "model": model,
+                        "workspace_path": "/path/to/your/project",
+                        "mode": "new",
+                        "prompt": "Your prompt here",
+                        "stream": True,
+                    },
+                )
+            )
+        return details
 
     def worker_info(self) -> list[WorkerInfo]:
         return [worker.info() for worker in self.workers.values()]

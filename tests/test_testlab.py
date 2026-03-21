@@ -107,7 +107,7 @@ def test_verify_copilot_pass(config_path, tmp_path):
             "items": [
                 {
                     "provider": "copilot",
-                    "model": "claude-sonnet-4.5",
+                    "model": "claude-sonnet-4.6",
                     "new_exit_code": 0,
                     "resume_text": "You manage PF, ATM, and Transit systems.",
                     "resume_exit_code": 0,

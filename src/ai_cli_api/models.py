@@ -92,7 +92,7 @@ class ChatRequest(BaseModel):
                 },
                 {
                     "provider": "copilot",
-                    "model": "claude-sonnet-4.5",
+                    "model": "claude-sonnet-4.6",
                     "workspace_path": "/home/user/project",
                     "mode": "new",
                     "prompt": "Add unit tests for the auth module.",
@@ -285,6 +285,7 @@ class ProviderCapability(BaseModel):
     provider: ProviderName = Field(description="Provider identifier.")
     executable: str | None = Field(description="Resolved path to the provider CLI executable, or null if not found.")
     enabled: bool = Field(description="Whether this provider is enabled in the configuration.")
+    models: list[str] = Field(description="List of configured model identifiers for this provider.")
     supports_resume: bool = Field(description="Whether the provider supports resuming previous sessions.")
     supports_streaming: bool = Field(description="Whether the provider supports streaming output.")
     supports_model_override: bool = Field(description="Whether a custom model can be specified per request.")
@@ -297,10 +298,46 @@ class ProviderCapability(BaseModel):
                     "provider": "claude",
                     "executable": "/usr/local/bin/claude",
                     "enabled": True,
+                    "models": ["opus", "sonnet", "haiku"],
                     "supports_resume": True,
                     "supports_streaming": True,
                     "supports_model_override": True,
                     "session_reference_format": "uuid",
+                }
+            ]
+        }
+    )
+
+
+class ModelDetail(BaseModel):
+    """Detailed information about a single available model, including how to call it."""
+
+    provider: ProviderName = Field(description="Provider that serves this model.")
+    model: str = Field(description="Model identifier to use in chat requests.")
+    ready: bool = Field(description="Whether the warm worker for this model is ready to accept requests.")
+    busy: bool = Field(description="Whether the worker is currently processing a request.")
+    supports_resume: bool = Field(description="Whether this model supports session resume.")
+    chat_request_example: dict[str, Any] = Field(
+        description="Example POST /v1/chat request body for this model.",
+    )
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "examples": [
+                {
+                    "provider": "copilot",
+                    "model": "claude-sonnet-4.6",
+                    "ready": True,
+                    "busy": False,
+                    "supports_resume": True,
+                    "chat_request_example": {
+                        "provider": "copilot",
+                        "model": "claude-sonnet-4.6",
+                        "workspace_path": "/path/to/project",
+                        "mode": "new",
+                        "prompt": "Explain this codebase.",
+                        "stream": True,
+                    },
                 }
             ]
         }

@@ -66,7 +66,7 @@ def test_chat_copilot_json(config_path, tmp_path):
     with TestClient(app) as client:
         body = {
             "provider": "copilot",
-            "model": "claude-sonnet-4.5",
+            "model": "claude-sonnet-4.6",
             "workspace_path": str(tmp_path.resolve()),
             "mode": "new",
             "prompt": "hello",
@@ -147,6 +147,31 @@ def test_providers_endpoint_shows_capabilities(config_path):
             assert "supports_streaming" in p
             assert "supports_model_override" in p
             assert "session_reference_format" in p
+            assert "models" in p
+            assert isinstance(p["models"], list)
+            assert len(p["models"]) >= 1
+
+
+def test_models_endpoint_returns_all_models(config_path):
+    app = create_app()
+    with TestClient(app) as client:
+        models = client.get("/v1/models").json()
+        assert len(models) == 8  # 2 gemini + 2 codex + 2 claude + 1 kimi + 1 copilot
+        providers_seen = {m["provider"] for m in models}
+        assert "claude" in providers_seen
+        assert "copilot" in providers_seen
+        for m in models:
+            assert "model" in m
+            assert "ready" in m
+            assert "busy" in m
+            assert "supports_resume" in m
+            assert "chat_request_example" in m
+            example = m["chat_request_example"]
+            assert example["provider"] == m["provider"]
+            assert example["model"] == m["model"]
+            assert example["mode"] == "new"
+            assert "prompt" in example
+            assert "workspace_path" in example
 
 
 def test_cors_headers_present(config_path):
