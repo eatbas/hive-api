@@ -23,7 +23,7 @@ async def test_worker_manager_boots_all_workers(loaded_config):
     await manager.start()
     try:
         workers = manager.worker_info()
-        assert len(workers) == 8
+        assert len(workers) == 9
         assert all(worker.ready for worker in workers)
     finally:
         await manager.stop()

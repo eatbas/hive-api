@@ -98,8 +98,8 @@ elif provider == "opencode":
     opencode_args = args[1:] if args and args[0] == "run" else args
     prompt = last_non_flag(opencode_args)
     session_id = read_flag("--session") or "ses_opencode_new"
-    emit(f'{{"type":"session.created","id":"{session_id}"}}')
-    emit(f'{{"type":"message.completed","content":"opencode:{prompt.replace(chr(34), chr(92)+chr(34))}"}}')
+    emit(f'{{"type":"init","sessionID":"{session_id}"}}')
+    emit(f'{{"type":"text","sessionID":"{session_id}","part":{{"text":"opencode:{prompt.replace(chr(34), chr(92)+chr(34))}"}}}}')
 else:
     emit('{"error":"unknown provider"}')
     sys.exit(1)

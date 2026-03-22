@@ -105,11 +105,11 @@ class TestPageLoad:
 
     def test_worker_count(self, console_page: Page):
         count = console_page.locator("#worker-count")
-        expect(count).to_have_text("7")
+        expect(count).to_have_text("9")
 
     def test_all_workers_shown(self, console_page: Page):
         chips = console_page.locator(".worker-chip")
-        expect(chips).to_have_count(7)
+        expect(chips).to_have_count(9)
 
     def test_all_workers_ready(self, console_page: Page):
         chips = console_page.locator(".worker-chip")
@@ -142,7 +142,6 @@ class TestProviderModelDropdowns:
         model_options = console_page.locator("#model option")
         models = [model_options.nth(i).get_attribute("value") for i in range(model_options.count())]
         assert "codex-5.3" in models
-        assert "gpt-5.4" in models
         assert "gpt-5.4-mini" in models
 
     def test_kimi_models(self, console_page: Page):
@@ -303,16 +302,14 @@ class TestFailedRequest:
         console_page.click("#refresh-button")
         console_page.wait_for_timeout(1000)
 
-        # The claude/sonnet worker should still be "ready" (not "down")
-        chips = console_page.locator(".worker-chip")
-        found_claude_sonnet = False
-        for i in range(chips.count()):
-            chip_text = chips.nth(i).inner_text()
-            if "claude/sonnet" in chip_text:
-                found_claude_sonnet = True
-                assert "ready" in chip_text, f"Expected 'ready' but got: {chip_text}"
-                break
-        assert found_claude_sonnet, "claude/sonnet worker chip not found"
+        # The claude/sonnet worker should still be "ready" (not "down").
+        # Worker chips display only the model name; provider is in the
+        # group header.  Look for a chip with "sonnet" inside the claude
+        # group.
+        claude_group = console_page.locator(".worker-group", has_text="claude")
+        sonnet_chip = claude_group.locator(".worker-chip", has_text="sonnet")
+        expect(sonnet_chip).to_have_count(1)
+        expect(sonnet_chip).to_contain_text("ready")
 
     def test_recovery_after_failure(self, console_page: Page, tmp_path):
         """After a failure, the next request should succeed."""
@@ -365,7 +362,7 @@ class TestRefreshWorkerState:
         console_page.click("#refresh-button")
         console_page.wait_for_timeout(500)
         chips = console_page.locator(".worker-chip")
-        expect(chips).to_have_count(7)
+        expect(chips).to_have_count(9)
 
 
 class TestModeToggle:

@@ -60,6 +60,7 @@ class TestPackageRegistry:
         assert "gemini" in PACKAGE_REGISTRY
         assert "kimi" in PACKAGE_REGISTRY
         assert "copilot" in PACKAGE_REGISTRY
+        assert "opencode" in PACKAGE_REGISTRY
 
     def test_copilot_is_npm(self):
         info = PACKAGE_REGISTRY["copilot"]
@@ -209,7 +210,7 @@ class TestCheckAndUpdateAll:
                 mock_latest.return_value = "1.0.0"
 
                 results = await u.check_and_update_all()
-                assert len(results) == 5
+                assert len(results) == 6
                 assert all(not r.needs_update for r in results)
                 mock_update.assert_not_called()
         finally:
@@ -239,8 +240,8 @@ class TestCheckAndUpdateAll:
                 mock_update.return_value = True
 
                 results = await u.check_and_update_all()
-                assert len(results) == 5
-                assert mock_update.call_count == 5
+                assert len(results) == 6
+                assert mock_update.call_count == 6
         finally:
             await manager.stop()
 
@@ -326,9 +327,152 @@ class TestLastResults:
                 mock_latest.return_value = "1.0.0"
 
                 await u.check_and_update_all()
-                assert len(u.last_results) == 5
+                assert len(u.last_results) == 6
         finally:
             await manager.stop()
+
+
+class TestOpenCodePackage:
+    def test_opencode_is_npm(self):
+        info = PACKAGE_REGISTRY["opencode"]
+        assert info.manager == "npm"
+        assert info.package == "opencode-ai"
+        assert info.provider == ProviderName.OPENCODE
+
+
+class TestUpdateSingleProvider:
+    @pytest.mark.asyncio()
+    async def test_force_update_single_provider(self, loaded_config):
+        manager = WorkerManager(loaded_config)
+        await manager.start()
+        try:
+            config = UpdaterConfig(enabled=True, interval_hours=4.0, auto_update=False)
+            u = CLIUpdater(manager=manager, config=config)
+
+            with patch.object(u, "get_current_version", new_callable=AsyncMock) as mock_curr, \
+                 patch.object(u, "get_latest_version", new_callable=AsyncMock) as mock_latest, \
+                 patch.object(u, "update_cli", new_callable=AsyncMock) as mock_update, \
+                 patch.object(manager, "restart_provider", new_callable=AsyncMock):
+                mock_curr.return_value = "1.1.0"
+                mock_latest.return_value = "1.1.0"
+                mock_update.return_value = True
+
+                result = await u.update_single_provider(ProviderName.CLAUDE)
+                assert result.provider == ProviderName.CLAUDE
+                assert mock_update.call_count == 1
+        finally:
+            await manager.stop()
+
+    @pytest.mark.asyncio()
+    async def test_force_update_disabled_provider(self, loaded_config):
+        manager = WorkerManager(loaded_config)
+        config = UpdaterConfig(enabled=True, interval_hours=4.0, auto_update=True)
+        u = CLIUpdater(manager=manager, config=config)
+
+        # Create a config with a disabled provider by patching
+        original_providers = manager.config.providers
+        manager.config.providers = {}
+        result = await u.update_single_provider(ProviderName.CLAUDE)
+        assert result.update_skipped_reason == "provider not enabled"
+        manager.config.providers = original_providers
+
+    @pytest.mark.asyncio()
+    async def test_force_update_busy_workers(self, loaded_config):
+        manager = WorkerManager(loaded_config)
+        await manager.start()
+        try:
+            config = UpdaterConfig(enabled=True, interval_hours=4.0, auto_update=True)
+            u = CLIUpdater(manager=manager, config=config)
+
+            # Mark a claude worker as busy
+            claude_workers = manager.workers_for_provider(ProviderName.CLAUDE)
+            claude_workers[0].busy = True
+
+            with patch.object(u, "get_current_version", new_callable=AsyncMock) as mock_curr, \
+                 patch.object(u, "get_latest_version", new_callable=AsyncMock) as mock_latest:
+                mock_curr.return_value = "1.0.0"
+                mock_latest.return_value = "1.1.0"
+
+                result = await u.update_single_provider(ProviderName.CLAUDE)
+                assert result.update_skipped_reason == "workers busy"
+        finally:
+            await manager.stop()
+
+    @pytest.mark.asyncio()
+    async def test_force_update_failure(self, loaded_config):
+        manager = WorkerManager(loaded_config)
+        await manager.start()
+        try:
+            config = UpdaterConfig(enabled=True, interval_hours=4.0, auto_update=True)
+            u = CLIUpdater(manager=manager, config=config)
+
+            with patch.object(u, "get_current_version", new_callable=AsyncMock) as mock_curr, \
+                 patch.object(u, "get_latest_version", new_callable=AsyncMock) as mock_latest, \
+                 patch.object(u, "update_cli", new_callable=AsyncMock) as mock_update:
+                mock_curr.return_value = "1.0.0"
+                mock_latest.return_value = "1.1.0"
+                mock_update.return_value = False
+
+                result = await u.update_single_provider(ProviderName.CLAUDE)
+                assert result.update_skipped_reason == "update command failed"
+        finally:
+            await manager.stop()
+
+    @pytest.mark.asyncio()
+    async def test_updates_cached_results(self, loaded_config):
+        manager = WorkerManager(loaded_config)
+        await manager.start()
+        try:
+            config = UpdaterConfig(enabled=True, interval_hours=4.0, auto_update=False)
+            u = CLIUpdater(manager=manager, config=config)
+
+            with patch.object(u, "get_current_version", new_callable=AsyncMock) as mock_curr, \
+                 patch.object(u, "get_latest_version", new_callable=AsyncMock) as mock_latest, \
+                 patch.object(u, "update_cli", new_callable=AsyncMock) as mock_update, \
+                 patch.object(manager, "restart_provider", new_callable=AsyncMock):
+                mock_curr.return_value = "1.0.0"
+                mock_latest.return_value = "1.0.0"
+                mock_update.return_value = True
+
+                # First populate cache via check_and_update_all
+                await u.check_and_update_all()
+                assert len(u.last_results) == 6
+
+                # Now update a single provider; cache should be updated
+                result = await u.update_single_provider(ProviderName.CLAUDE)
+                assert result.provider == ProviderName.CLAUDE
+                # Cache still has 6 entries, one updated
+                assert len(u.last_results) == 6
+        finally:
+            await manager.stop()
+
+
+class TestVersionComparisonEdgeCases:
+    @pytest.mark.asyncio()
+    async def test_version_check_with_none_versions(self, loaded_config):
+        manager = WorkerManager(loaded_config)
+        await manager.start()
+        try:
+            config = UpdaterConfig(enabled=True, interval_hours=4.0, auto_update=True)
+            u = CLIUpdater(manager=manager, config=config)
+
+            with patch.object(u, "get_current_version", new_callable=AsyncMock) as mock_curr, \
+                 patch.object(u, "get_latest_version", new_callable=AsyncMock) as mock_latest, \
+                 patch.object(u, "update_cli", new_callable=AsyncMock) as mock_update:
+                mock_curr.return_value = None
+                mock_latest.return_value = None
+
+                results = await u.check_and_update_all()
+                assert all(not r.needs_update for r in results)
+                mock_update.assert_not_called()
+        finally:
+            await manager.stop()
+
+    @pytest.mark.asyncio()
+    async def test_update_cli_unknown_manager(self, updater):
+        pkg = CLIPackageInfo(ProviderName.CLAUDE, "pip", "some-package")
+        result = await updater.update_cli(pkg)
+        assert result is False
 
 
 class TestAPIEndpoints:
@@ -349,14 +493,18 @@ class TestAPIEndpoints:
         app = create_app()
         with TestClient(app) as client:
             with patch(
-                "ai_cli_api.updater.CLIUpdater._run_cmd",
+                "ai_cli_api.updater.CLIUpdater.get_current_version",
                 new_callable=AsyncMock,
-            ) as mock_cmd:
-                mock_cmd.return_value = (0, "1.0.0")
+            ) as mock_curr, patch(
+                "ai_cli_api.updater.CLIUpdater.get_latest_version",
+                new_callable=AsyncMock,
+            ) as mock_latest:
+                mock_curr.return_value = "1.0.0"
+                mock_latest.return_value = "1.0.0"
                 response = client.post("/v1/cli-versions/check")
                 assert response.status_code == 200
                 data = response.json()
-                assert len(data) == 5
+                assert len(data) == 6
                 for item in data:
                     assert "provider" in item
                     assert "current_version" in item
