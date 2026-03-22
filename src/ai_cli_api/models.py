@@ -286,6 +286,12 @@ class ProviderCapability(BaseModel):
     provider: ProviderName = Field(description="Provider identifier.")
     executable: str | None = Field(description="Resolved path to the provider CLI executable, or null if not found.")
     enabled: bool = Field(description="Whether this provider is enabled in the configuration.")
+    available: bool = Field(
+        description=(
+            "Whether the CLI executable was found on the system at startup. "
+            "False means the provider cannot accept requests."
+        ),
+    )
     models: list[str] = Field(description="List of configured model identifiers for this provider.")
     supports_resume: bool = Field(description="Whether the provider supports resuming previous sessions.")
     supports_streaming: bool = Field(description="Whether the provider supports streaming output.")
@@ -299,6 +305,7 @@ class ProviderCapability(BaseModel):
                     "provider": "claude",
                     "executable": "/usr/local/bin/claude",
                     "enabled": True,
+                    "available": True,
                     "models": ["opus", "sonnet", "haiku"],
                     "supports_resume": True,
                     "supports_streaming": True,

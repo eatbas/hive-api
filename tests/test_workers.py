@@ -1,4 +1,5 @@
 import asyncio
+from unittest.mock import patch
 
 import pytest
 
@@ -156,5 +157,52 @@ async def test_health_details_reports_worker_errors(loaded_config):
         details = manager.health_details()
         assert len(details) > 0
         assert "claude" in details[0].lower()
+    finally:
+        await manager.stop()
+
+
+@pytest.mark.asyncio()
+async def test_unavailable_provider_skips_worker_creation(loaded_config):
+    """When a CLI is not found, no workers should be created for that provider."""
+    import shutil
+
+    original_which = shutil.which
+
+    def _fake_which(cmd: str, **kwargs) -> str | None:  # type: ignore[override]
+        if "claude" in str(cmd):
+            return None
+        return original_which(cmd, **kwargs)
+
+    with patch("ai_cli_api.providers.base.shutil.which", side_effect=_fake_which):
+        manager = WorkerManager(loaded_config)
+        await manager.start()
+        try:
+            assert manager.get_worker(ProviderName.CLAUDE, "sonnet") is None
+            assert manager.get_worker(ProviderName.CLAUDE, "opus") is None
+            assert manager.available_providers[ProviderName.CLAUDE] is False
+
+            # Other providers should still have workers
+            assert manager.get_worker(ProviderName.GEMINI, "gemini-2.5-flash") is not None
+            assert manager.available_providers[ProviderName.GEMINI] is True
+
+            # capabilities() should report available=False for claude
+            caps = {c.provider: c for c in manager.capabilities()}
+            assert caps[ProviderName.CLAUDE].available is False
+            assert caps[ProviderName.GEMINI].available is True
+        finally:
+            await manager.stop()
+
+
+@pytest.mark.asyncio()
+async def test_capabilities_include_available_field(loaded_config):
+    """All providers should have the available field in capabilities."""
+    manager = WorkerManager(loaded_config)
+    await manager.start()
+    try:
+        caps = manager.capabilities()
+        for cap in caps:
+            assert hasattr(cap, "available")
+            # All test providers use absolute paths so should be available
+            assert cap.available is True
     finally:
         await manager.stop()

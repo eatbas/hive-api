@@ -1058,6 +1058,81 @@
       }
     }
 
+    function buildVersionCard(v) {
+      const card = document.createElement("div");
+      const outdated = v.needs_update;
+      const unknown = !v.current_version && !v.latest_version;
+      const justUpdated = !!v.last_updated;
+      card.className = `version-card${outdated && !justUpdated ? " outdated" : ""}`;
+      card.dataset.provider = v.provider;
+
+      let badgeClass = "up-to-date";
+      let badgeText = "Up to date";
+      if (unknown) {
+        badgeClass = "unknown";
+        badgeText = "Unknown";
+      } else if (justUpdated) {
+        badgeClass = "up-to-date";
+        badgeText = "Just updated";
+      } else if (outdated) {
+        badgeClass = "update-available";
+        badgeText = "Update available";
+      }
+
+      let skipHtml = "";
+      if (v.update_skipped_reason) {
+        skipHtml = `<div class="version-skip">Skipped: ${v.update_skipped_reason}</div>`;
+      }
+
+      const btnDisabled = (!outdated && !unknown) || justUpdated;
+      const btnText = justUpdated ? "Updated" : (!outdated && !unknown ? "Already updated" : "Update");
+
+      card.innerHTML = `
+        <div class="version-card-header">
+          <strong>${v.provider}</strong>
+          <span class="version-badge ${badgeClass}">${badgeText}</span>
+        </div>
+        <div class="version-row">
+          <span>Installed</span>
+          <span>${v.current_version || "—"}</span>
+        </div>
+        <div class="version-row">
+          <span>Latest</span>
+          <span>${v.latest_version || "—"}</span>
+        </div>
+        <div class="version-row">
+          <span>Next check</span>
+          <span>${v.next_check_at ? new Date(v.next_check_at).toLocaleTimeString() : "—"}</span>
+        </div>
+        <div class="version-row">
+          <span>Auto-update</span>
+          <span>${v.auto_update ? "Enabled" : "Disabled"}</span>
+        </div>
+        ${skipHtml}
+        <div class="version-card-footer">
+          <button class="version-update-btn" data-provider="${v.provider}" ${btnDisabled ? "disabled" : ""}>${btnText}</button>
+          <span class="meta" data-update-status="${v.provider}"></span>
+        </div>
+      `;
+
+      const btn = card.querySelector(".version-update-btn");
+      btn.addEventListener("click", () => updateProvider(btn.dataset.provider, btn));
+      return card;
+    }
+
+    function renderVersionCard(v) {
+      const existing = versionGridEl.querySelector(`.version-card[data-provider="${v.provider}"]`);
+      const card = buildVersionCard(v);
+      if (existing) {
+        existing.replaceWith(card);
+      } else {
+        // Remove placeholder text if present
+        const placeholder = versionGridEl.querySelector(".meta");
+        if (placeholder) placeholder.remove();
+        versionGridEl.appendChild(card);
+      }
+    }
+
     function renderVersions(versions) {
       versionGridEl.innerHTML = "";
       if (!versions.length) {
@@ -1065,82 +1140,26 @@
         return;
       }
       for (const v of versions) {
-        const card = document.createElement("div");
-        const outdated = v.needs_update;
-        const unknown = !v.current_version && !v.latest_version;
-        card.className = `version-card${outdated ? " outdated" : ""}`;
-
-        let badgeClass = "up-to-date";
-        let badgeText = "Up to date";
-        if (unknown) {
-          badgeClass = "unknown";
-          badgeText = "Unknown";
-        } else if (outdated) {
-          badgeClass = "update-available";
-          badgeText = "Update available";
-        }
-
-        let skipHtml = "";
-        if (v.update_skipped_reason) {
-          skipHtml = `<div class="version-skip">Skipped: ${v.update_skipped_reason}</div>`;
-        }
-
-        card.innerHTML = `
-          <div class="version-card-header">
-            <strong>${v.provider}</strong>
-            <span class="version-badge ${badgeClass}">${badgeText}</span>
-          </div>
-          <div class="version-row">
-            <span>Installed</span>
-            <span>${v.current_version || "—"}</span>
-          </div>
-          <div class="version-row">
-            <span>Latest</span>
-            <span>${v.latest_version || "—"}</span>
-          </div>
-          <div class="version-row">
-            <span>Next check</span>
-            <span>${v.next_check_at ? new Date(v.next_check_at).toLocaleTimeString() : "—"}</span>
-          </div>
-          <div class="version-row">
-            <span>Auto-update</span>
-            <span>${v.auto_update ? "Enabled" : "Disabled"}</span>
-          </div>
-          ${skipHtml}
-          <div class="version-card-footer">
-            <button class="version-update-btn" data-provider="${v.provider}" ${!outdated && !unknown ? "disabled" : ""}>${!outdated && !unknown ? "Already updated" : "Update"}</button>
-            <span class="meta" data-update-status="${v.provider}"></span>
-          </div>
-        `;
-        versionGridEl.appendChild(card);
-      }
-
-      // Bind per-card update buttons
-      for (const btn of versionGridEl.querySelectorAll(".version-update-btn")) {
-        btn.addEventListener("click", () => updateProvider(btn.dataset.provider, btn));
+        versionGridEl.appendChild(buildVersionCard(v));
       }
     }
 
     async function updateProvider(provider, btn) {
       btn.disabled = true;
+      btn.textContent = "Updating…";
       const statusEl = versionGridEl.querySelector(`[data-update-status="${provider}"]`);
-      if (statusEl) statusEl.textContent = "Updating…";
+      if (statusEl) statusEl.textContent = "";
       try {
         const response = await fetch(`/v1/cli-versions/${provider}/update`, { method: "POST" });
         const result = await response.json();
         if (!response.ok) {
           throw new Error(result.detail || "Update failed");
         }
-        if (statusEl) {
-          statusEl.textContent = result.last_updated ? "Updated!" : (result.update_skipped_reason || "Done");
-        }
-        // Refresh all version cards with fresh data
-        const all = await fetchVersions();
-        renderVersions(all);
+        renderVersionCard(result);
       } catch (error) {
-        if (statusEl) statusEl.textContent = error.message;
-      } finally {
+        btn.textContent = "Retry";
         btn.disabled = false;
+        if (statusEl) statusEl.textContent = error.message;
       }
     }
 
@@ -1149,9 +1168,35 @@
       return await response.json();
     }
 
-    async function checkForUpdates() {
-      const response = await fetch("/v1/cli-versions/check", { method: "POST" });
+    async function checkProviderVersion(provider, signal) {
+      const response = await fetch(`/v1/cli-versions/${provider}/check`, { method: "POST", signal });
+      if (!response.ok) return null;
       return await response.json();
+    }
+
+    async function checkForUpdatesParallel(onResult) {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 90_000);
+      try {
+        const providersResponse = await fetch("/v1/providers", { signal: controller.signal });
+        const providers = await providersResponse.json();
+        const enabled = providers.filter(p => p.enabled).map(p => p.provider);
+
+        const promises = enabled.map(async (provider) => {
+          try {
+            const result = await checkProviderVersion(provider, controller.signal);
+            if (result) onResult(result);
+            return result;
+          } catch { return null; }
+        });
+
+        const settled = await Promise.allSettled(promises);
+        return settled
+          .filter(s => s.status === "fulfilled" && s.value !== null)
+          .map(s => s.value);
+      } finally {
+        clearTimeout(timeoutId);
+      }
     }
 
     async function refreshState() {
@@ -1175,7 +1220,7 @@
       const savedModel = modelSelect.value;
 
       providerSelect.innerHTML = "";
-      for (const provider of providers.filter((item) => item.enabled)) {
+      for (const provider of providers.filter((item) => item.enabled && item.available)) {
         const option = document.createElement("option");
         option.value = provider.provider;
         option.textContent = provider.provider;
@@ -1326,16 +1371,24 @@
 
     checkUpdatesButton.addEventListener("click", async () => {
       checkUpdatesButton.disabled = true;
-      versionMetaEl.textContent = "Checking…";
+      versionGridEl.innerHTML = "";
+      let completed = 0;
+      versionMetaEl.textContent = "Checking providers…";
       try {
-        const versions = await checkForUpdates();
-        renderVersions(versions);
-        const lastChecked = versions.length && versions[0].last_checked;
+        const results = await checkForUpdatesParallel((result) => {
+          completed++;
+          versionMetaEl.textContent = `Checked ${completed} provider(s)…`;
+          renderVersionCard(result);
+        });
+        const lastChecked = results.length && results[0].last_checked;
         versionMetaEl.textContent = lastChecked
           ? `Last checked: ${new Date(lastChecked).toLocaleString()}`
           : "Done.";
+        if (!results.length) {
+          versionGridEl.innerHTML = '<span class="meta">No version data returned.</span>';
+        }
       } catch (error) {
-        versionMetaEl.textContent = error.message;
+        versionMetaEl.textContent = error.name === "AbortError" ? "Timed out." : error.message;
       } finally {
         checkUpdatesButton.disabled = false;
       }

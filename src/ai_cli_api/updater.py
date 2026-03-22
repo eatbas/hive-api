@@ -277,6 +277,7 @@ class CLIUpdater:
                 success = await self.update_cli(pkg_info)
                 if success:
                     await self.manager.restart_provider(provider)
+                    await self.manager.activate_provider(provider)
                     last_updated = datetime.now(timezone.utc).isoformat()
                     current = await self.get_current_version(
                         executable or adapter.default_executable, provider
@@ -308,6 +309,20 @@ class CLIUpdater:
             last_updated=last_updated,
             update_skipped_reason=skip_reason,
         )
+
+    async def check_single_provider(self, provider: ProviderName) -> CLIVersionStatus | None:
+        """Check a single provider and update the cached results."""
+        now = datetime.now(timezone.utc).isoformat()
+        next_check = self._next_check_at()
+        result = await self._check_single_provider(provider, now, next_check)
+        if result is not None:
+            self._last_results = [
+                result if r.provider == provider else r
+                for r in self._last_results
+            ]
+            if not any(r.provider == provider for r in self._last_results):
+                self._last_results.append(result)
+        return result
 
     async def check_and_update_all(self) -> list[CLIVersionStatus]:
         now = datetime.now(timezone.utc).isoformat()
@@ -375,6 +390,7 @@ class CLIUpdater:
         success = await self.update_cli(pkg_info)
         if success:
             await self.manager.restart_provider(provider)
+            await self.manager.activate_provider(provider)
             last_updated = datetime.now(timezone.utc).isoformat()
             current = await self.get_current_version(executable or adapter.default_executable, provider)
         else:

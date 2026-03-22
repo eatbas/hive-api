@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -9,6 +10,8 @@ from .models import ChatRequest, ChatResponse, ModelDetail, ProviderCapability, 
 from .providers.base import ParseState, ProviderAdapter
 from .providers.registry import build_provider_registry
 from .shells import BashSession, ShellSessionError, detect_bash_path
+
+logger = logging.getLogger("ai_cli_api.worker")
 
 
 def _safe_error_message(exc: BaseException) -> str:
@@ -248,13 +251,34 @@ class WorkerManager:
         self.registry = build_provider_registry()
         self.workers: dict[tuple[ProviderName, str], WarmWorker] = {}
         self.session_models: dict[tuple[ProviderName, str], str] = {}
+        self.available_providers: dict[ProviderName, bool] = {}
 
     async def start(self) -> None:
         for provider, provider_config in self.config.providers.items():
             if not provider_config.enabled:
+                self.available_providers[provider] = False
+                logger.info("Provider %s: disabled by configuration", provider.value)
                 continue
+
             adapter = self.registry[provider]
             executable = adapter.resolve_executable(provider_config.executable)
+
+            if not adapter.is_available(provider_config.executable):
+                self.available_providers[provider] = False
+                logger.warning(
+                    "Provider %s: CLI '%s' not found -- skipping worker creation",
+                    provider.value,
+                    executable,
+                )
+                continue
+
+            self.available_providers[provider] = True
+            logger.info(
+                "Provider %s: CLI '%s' found -- starting %d worker(s)",
+                provider.value,
+                executable,
+                len(provider_config.models),
+            )
             for model in provider_config.models:
                 worker = WarmWorker(
                     provider=provider,
@@ -283,6 +307,7 @@ class WorkerManager:
                     provider=provider,
                     executable=adapter.resolve_executable(provider_config.executable),
                     enabled=provider_config.enabled,
+                    available=self.available_providers.get(provider, False),
                     models=provider_config.models,
                     supports_resume=adapter.supports_resume,
                     supports_streaming=adapter.supports_streaming,
@@ -326,6 +351,44 @@ class WorkerManager:
         for worker in self.workers_for_provider(provider):
             await worker.stop()
             await worker.start()
+
+    async def activate_provider(self, provider: ProviderName) -> bool:
+        """Create workers for a provider that was previously unavailable.
+
+        Returns True if workers were successfully created.
+        """
+        if self.available_providers.get(provider, False):
+            return True  # Already active.
+
+        provider_config = self.config.providers.get(provider)
+        if provider_config is None or not provider_config.enabled:
+            return False
+
+        adapter = self.registry[provider]
+        if not adapter.is_available(provider_config.executable):
+            return False
+
+        executable = adapter.resolve_executable(provider_config.executable)
+        self.available_providers[provider] = True
+        logger.info(
+            "Provider %s: CLI now available at '%s' -- creating workers",
+            provider.value,
+            executable,
+        )
+        for model in provider_config.models:
+            if (provider, model) not in self.workers:
+                worker = WarmWorker(
+                    provider=provider,
+                    model=model,
+                    adapter=adapter,
+                    executable=executable,
+                    shell_path=self.shell_path,
+                    default_options=provider_config.default_options,
+                    session_models=self.session_models,
+                )
+                await worker.start()
+                self.workers[(provider, model)] = worker
+        return True
 
     def get_idle_worker(self, provider: ProviderName) -> WarmWorker | None:
         """Return the first idle, ready worker for *provider*, or None."""

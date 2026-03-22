@@ -166,6 +166,7 @@ def test_providers_endpoint_shows_capabilities(config_path):
             assert "supports_streaming" in p
             assert "supports_model_override" in p
             assert "session_reference_format" in p
+            assert "available" in p
             assert "models" in p
             assert isinstance(p["models"], list)
             assert len(p["models"]) >= 1

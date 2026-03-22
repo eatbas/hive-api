@@ -1,10 +1,13 @@
 import json
+import logging
 import re
 from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import AsyncIterator
 
 from fastapi import FastAPI, HTTPException
+
+logger = logging.getLogger("ai_cli_api.service")
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse, JSONResponse, StreamingResponse
 
@@ -151,6 +154,16 @@ def create_app() -> FastAPI:
     @asynccontextmanager
     async def lifespan(_: FastAPI):
         await manager.start()
+
+        available = [p.value for p, ok in manager.available_providers.items() if ok]
+        unavailable = [p.value for p, ok in manager.available_providers.items() if not ok]
+        logger.info(
+            "CLI availability: available=%s, unavailable=%s, workers=%d",
+            available or "none",
+            unavailable or "none",
+            len(manager.workers),
+        )
+
         updater.start()
         try:
             yield
@@ -351,6 +364,28 @@ Check `GET /v1/providers` for the `supports_resume` flag before attempting to re
     )
     async def cli_versions_check() -> list[CLIVersionStatus]:
         return await updater.check_and_update_all()
+
+    @app.post(
+        "/v1/cli-versions/{provider}/check",
+        tags=["Updates"],
+        summary="Check a single CLI provider for updates",
+        description=(
+            "Checks version status for a single provider. Designed for "
+            "parallel per-provider checks from the UI."
+        ),
+        response_model=CLIVersionStatus,
+        responses={
+            404: {
+                "description": "Unknown provider name.",
+                "model": ErrorDetail,
+            },
+        },
+    )
+    async def cli_version_check_single(provider: ProviderName) -> CLIVersionStatus:
+        result = await updater.check_single_provider(provider)
+        if result is None:
+            raise HTTPException(status_code=404, detail=f"Provider '{provider.value}' not found or not enabled")
+        return result
 
     @app.post(
         "/v1/cli-versions/{provider}/update",

@@ -2,12 +2,22 @@ from __future__ import annotations
 
 import json
 import shlex
+import shutil
 import uuid
 from dataclasses import dataclass, field
 from typing import Any
 
 from ..models import ChatMode, ProviderName
 from ..shells import to_bash_path
+
+
+def check_cli_available(executable: str) -> bool:
+    """Return True if *executable* is found on PATH or at the given path.
+
+    Works for both bare command names (``'claude'``) and absolute paths
+    (``'/usr/local/bin/claude'``).
+    """
+    return shutil.which(executable) is not None
 
 
 @dataclass(slots=True)
@@ -35,6 +45,10 @@ class ProviderAdapter:
 
     def resolve_executable(self, override: str | None) -> str:
         return override or self.default_executable
+
+    def is_available(self, override: str | None = None) -> bool:
+        """Check whether the resolved CLI executable is findable on PATH."""
+        return check_cli_available(self.resolve_executable(override))
 
     def build_command(
         self,
