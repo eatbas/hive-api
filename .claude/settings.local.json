@@ -45,7 +45,9 @@
       "Bash(\"C:/Program Files/Git/bin/bash.exe\" -c \"pwd\")",
       "Bash(\"C:/Program Files/Git/bin/bash.exe\" -c \"echo ok\")",
       "mcp__Claude_Preview__preview_start",
-      "mcp__mcp-registry__search_mcp_registry"
+      "mcp__mcp-registry__search_mcp_registry",
+      "mcp__plugin_context7_context7__resolve-library-id",
+      "mcp__plugin_context7_context7__query-docs"
     ]
   }
 }

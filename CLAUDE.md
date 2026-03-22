@@ -32,6 +32,26 @@
 - **Use context7** MCP tool to look up current documentation before writing code that depends on a library.
 - Do not rely on memorized or outdated API signatures — verify with context7.
 
+## Documentation & ReDoc Sync
+
+- When adding, updating, or removing an endpoint, update the **FastAPI route metadata** (summary, description, response_model, tags) so `/docs` and `/redoc` stay accurate.
+- When changing request/response shapes, update the corresponding **Pydantic models** in `models.py` — ReDoc auto-generates from these.
+- When adding a new provider or integration, update the `API_DESCRIPTION` in `service.py` and the **README.md** usage section.
+- After any API-surface change, open `/redoc` locally and verify the docs render correctly before considering the task done.
+
+## Test Coverage
+
+- Every new endpoint or public method **must** have at least one test before the task is complete.
+- When modifying an existing endpoint's behavior, update the corresponding tests to match.
+- New providers require: a fake CLI branch in `tests/fakes/fake_cli.py`, a config section in `conftest.py`, and a dedicated test in `test_api.py`.
+- Run `pytest` and confirm all tests pass before finishing any change.
+
+## README Maintenance
+
+- Keep `README.md` in sync with the live API surface — endpoints, providers, models, and config options.
+- When a provider is added or removed, update the provider table and config examples.
+- Usage examples in the README must be copy-pasteable and correct.
+
 ## Don't Assume — Ask
 
 - If requirements are ambiguous, **ask** before implementing.

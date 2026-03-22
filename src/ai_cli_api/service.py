@@ -33,7 +33,7 @@ from .worker import WorkerManager
 UI_INDEX = Path(__file__).with_name("ui") / "index.html"
 
 API_DESCRIPTION = """\
-Warm-worker API wrapper for AI coding CLIs (Gemini, Codex, Claude, Kimi, Copilot).
+Warm-worker API wrapper for AI coding CLIs (Gemini, Codex, Claude, Kimi, Copilot, OpenCode).
 
 The API maintains **persistent warm worker processes** for each configured
 provider/model pair, enabling low-latency prompt execution without cold-start
@@ -41,7 +41,7 @@ overhead.
 
 ## Key Concepts
 
-- **Providers** — Supported AI CLIs: `gemini`, `codex`, `claude`, `kimi`, `copilot`.
+- **Providers** — Supported AI CLIs: `gemini`, `codex`, `claude`, `kimi`, `copilot`, `opencode`.
 - **Models** — Each provider exposes one or more models (e.g. `copilot` offers
   `claude-sonnet-4.6`, `gpt-5.4`, `gemini-3-flash-preview`, etc.).
   Use `GET /v1/models` to discover all available models with ready-to-use chat examples.

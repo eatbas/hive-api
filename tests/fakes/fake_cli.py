@@ -22,7 +22,7 @@ def last_non_flag(arguments):
     skip_next = False
     flags_with_values = {
         "-p", "--prompt", "-m", "--model", "--resume", "--session-id", "--session",
-        "--output-format", "--permission-mode", "-o",
+        "--output-format", "--permission-mode", "-o", "--format", "--agent",
     }
     for arg in arguments:
         if skip_next:
@@ -94,6 +94,12 @@ elif provider == "copilot":
     session_id = read_flag("--resume") or "copilot-session-new"
     emit(f'{{"type":"assistant.message","data":{{"content":"copilot:{prompt.replace(chr(34), chr(92)+chr(34))}","messageId":"msg-1"}}}}')
     emit(f'{{"type":"result","sessionId":"{session_id}","exitCode":0}}')
+elif provider == "opencode":
+    opencode_args = args[1:] if args and args[0] == "run" else args
+    prompt = last_non_flag(opencode_args)
+    session_id = read_flag("--session") or "ses_opencode_new"
+    emit(f'{{"type":"session.created","id":"{session_id}"}}')
+    emit(f'{{"type":"message.completed","content":"opencode:{prompt.replace(chr(34), chr(92)+chr(34))}"}}')
 else:
     emit('{"error":"unknown provider"}')
     sys.exit(1)

@@ -17,6 +17,7 @@ class ProviderName(StrEnum):
     CLAUDE = "claude"
     KIMI = "kimi"
     COPILOT = "copilot"
+    OPENCODE = "opencode"
 
 
 class ChatMode(StrEnum):

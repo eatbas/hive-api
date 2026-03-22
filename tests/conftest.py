@@ -62,6 +62,12 @@ enabled = true
 executable = "{providers['copilot'].replace('\\', '\\\\')}"
 models = ["claude-sonnet-4.6"]
 default_options = {{ extra_args = [] }}
+
+[providers.opencode]
+enabled = true
+executable = "{providers['opencode'].replace('\\', '\\\\')}"
+models = ["glm-4.7-flash"]
+default_options = {{ extra_args = [] }}
 """.strip(),
         encoding="utf-8",
     )

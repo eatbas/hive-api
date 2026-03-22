@@ -109,6 +109,48 @@
       font-weight: 700;
     }
 
+    .tab-bar {
+      display: flex;
+      gap: 0;
+      border-bottom: 2px solid var(--line);
+      margin-bottom: 0;
+    }
+
+    .tab-btn {
+      padding: 12px 24px;
+      font-size: 0.92rem;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      background: none;
+      color: var(--muted);
+      border: none;
+      border-bottom: 3px solid transparent;
+      border-radius: 0;
+      cursor: pointer;
+      transition: color 150ms, border-color 150ms;
+      margin-bottom: -2px;
+      box-shadow: none;
+    }
+
+    .tab-btn:hover {
+      color: var(--ink);
+      transform: none;
+    }
+
+    .tab-btn.active {
+      color: var(--accent);
+      border-bottom-color: var(--accent);
+    }
+
+    .tab-panel {
+      display: none;
+    }
+
+    .tab-panel.active {
+      display: block;
+    }
+
     .grid {
       display: grid;
       grid-template-columns: 420px minmax(0, 1fr);
@@ -251,15 +293,13 @@
       border: 1px solid rgba(255, 255, 255, 0.08);
     }
 
-    .pill-row,
-    .worker-list {
+    .pill-row {
       display: flex;
       flex-wrap: wrap;
       gap: 10px;
     }
 
-    .pill,
-    .worker-chip {
+    .pill {
       border-radius: 999px;
       padding: 8px 12px;
       background: var(--panel-strong);
@@ -267,8 +307,62 @@
       font-size: 0.9rem;
     }
 
+    .worker-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 12px;
+    }
+
+    .worker-group {
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      background: var(--panel-strong);
+      overflow: hidden;
+    }
+
+    .worker-group-header {
+      padding: 8px 12px;
+      background: rgba(208, 90, 45, 0.07);
+      border-bottom: 1px solid var(--line);
+      font-weight: 700;
+      font-size: 0.9rem;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--accent);
+    }
+
+    .worker-group-header .worker-group-count {
+      font-weight: 400;
+      font-size: 0.78rem;
+      color: var(--muted);
+      text-transform: none;
+      letter-spacing: 0;
+    }
+
+    .worker-group-items {
+      padding: 8px 10px;
+      display: grid;
+      gap: 4px;
+    }
+
+    .worker-chip {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 0.84rem;
+      padding: 4px 8px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #fff;
+    }
+
     .worker-chip strong {
       color: var(--accent);
+    }
+
+    .worker-chip .worker-status {
+      margin-left: auto;
+      font-size: 0.78rem;
     }
 
     .ok {
@@ -485,25 +579,78 @@
 
     .model-grid {
       display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-      gap: 8px;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 12px;
     }
 
-    .model-grid label {
+    .provider-group {
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      background: var(--panel-strong);
+      overflow: hidden;
+    }
+
+    .provider-group-header {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 12px;
+      background: rgba(208, 90, 45, 0.07);
+      border-bottom: 1px solid var(--line);
+      cursor: pointer;
+    }
+
+    .provider-group-header input[type=checkbox] {
+      accent-color: var(--accent);
+      width: 16px;
+      height: 16px;
+    }
+
+    .provider-group-header span {
+      font-weight: 700;
+      font-size: 0.9rem;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--accent);
+    }
+
+    .provider-group-header .provider-count {
+      font-weight: 400;
+      font-size: 0.78rem;
+      color: var(--muted);
+      text-transform: none;
+      letter-spacing: 0;
+    }
+
+    .provider-group-models {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+      gap: 6px;
+      padding: 8px 10px;
+    }
+
+    .provider-group-models label {
       display: flex;
       align-items: center;
       gap: 6px;
-      font-size: 0.88rem;
-      padding: 6px 10px;
+      font-size: 0.86rem;
+      padding: 5px 8px;
       border: 1px solid var(--line);
-      border-radius: 10px;
-      background: var(--panel-strong);
+      border-radius: 8px;
+      background: #fff;
       cursor: pointer;
-      transition: border-color 150ms;
+      transition: border-color 150ms, background 150ms;
     }
 
-    .model-grid label:hover {
+    .provider-group-models label:hover {
       border-color: var(--accent);
+      background: rgba(208, 90, 45, 0.04);
+    }
+
+    .provider-group-models input[type=checkbox] {
+      accent-color: var(--accent);
+      width: 15px;
+      height: 15px;
     }
 
     .select-all-row {
@@ -511,6 +658,12 @@
       align-items: center;
       gap: 8px;
       margin-bottom: 4px;
+    }
+
+    .select-all-row input[type=checkbox] {
+      accent-color: var(--accent);
+      width: 16px;
+      height: 16px;
     }
 
     .select-all-row label {
@@ -617,6 +770,13 @@
       }
     }
 
+    @media (max-width: 768px) {
+      .model-grid,
+      .worker-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
     @media (max-width: 640px) {
       .shell {
         width: min(100vw - 16px, 100%);
@@ -663,77 +823,137 @@
       </div>
     </section>
 
-    <section class="grid">
-      <div class="panel">
-        <h2>Request</h2>
-        <form class="form" id="chat-form">
-          <div class="row">
-            <div class="field">
-              <label for="provider">Provider</label>
-              <select id="provider" name="provider"></select>
-            </div>
-            <div class="field">
-              <label for="model">Model</label>
-              <select id="model" name="model"></select>
-            </div>
-          </div>
-
-          <div class="row">
-            <div class="field">
-              <label for="mode">Mode</label>
-              <select id="mode" name="mode">
-                <option value="new">new</option>
-                <option value="resume">resume</option>
-              </select>
-            </div>
-            <div class="field">
-              <label for="stream">Response Mode</label>
-              <div class="toggle">
-                <input id="stream" name="stream" type="checkbox" checked>
-                <span>Stream with SSE parser</span>
-              </div>
-            </div>
-          </div>
-
-          <div class="field">
-            <label for="workspace_path">Workspace Path</label>
-            <input id="workspace_path" name="workspace_path" type="text" value="C:\\Github\\ai-cli-api" placeholder="C:\\Github\\ai-cli-api">
-          </div>
-
-          <div class="field" id="session-row">
-            <label for="provider_session_ref">Provider Session Ref</label>
-            <input id="provider_session_ref" name="provider_session_ref" type="text" placeholder="Required for resume mode">
-          </div>
-
-          <div class="field">
-            <label for="prompt">Prompt</label>
-            <textarea id="prompt" name="prompt" placeholder="Ask the selected CLI something simple first."></textarea>
-          </div>
-
-          <div class="actions">
-            <button class="primary" id="send-button" type="submit">Send Request</button>
-            <button class="secondary" id="refresh-button" type="button">Refresh Worker State</button>
-          </div>
-
-          <div class="meta" id="request-meta">Ready.</div>
-        </form>
-      </div>
-
-      <div class="panel response-card">
-        <div>
-          <h2>Response</h2>
-          <div class="pill-row">
-            <span class="pill">stream events: <strong id="event-count">0</strong></span>
-            <span class="pill">current session: <strong id="session-ref">none</strong></span>
-          </div>
-        </div>
-        <div class="console" id="console"></div>
-        <div>
-          <h2>Warm Workers</h2>
-          <div class="worker-list" id="worker-list"></div>
-        </div>
+    <section class="panel" style="padding-bottom:0">
+      <div class="tab-bar">
+        <button class="tab-btn active" data-tab="request" onclick="switchTab('request')">Request</button>
+        <button class="tab-btn" data-tab="testlab" onclick="switchTab('testlab')">Test Lab</button>
       </div>
     </section>
+
+    <div id="tab-request" class="tab-panel active">
+      <section class="grid">
+        <div class="panel">
+          <h2>Request</h2>
+          <form class="form" id="chat-form">
+            <div class="row">
+              <div class="field">
+                <label for="provider">Provider</label>
+                <select id="provider" name="provider"></select>
+              </div>
+              <div class="field">
+                <label for="model">Model</label>
+                <select id="model" name="model"></select>
+              </div>
+            </div>
+
+            <div class="row">
+              <div class="field">
+                <label for="mode">Mode</label>
+                <select id="mode" name="mode">
+                  <option value="new">new</option>
+                  <option value="resume">resume</option>
+                </select>
+              </div>
+              <div class="field">
+                <label for="stream">Response Mode</label>
+                <div class="toggle">
+                  <input id="stream" name="stream" type="checkbox" checked>
+                  <span>Stream with SSE parser</span>
+                </div>
+              </div>
+            </div>
+
+            <div class="field">
+              <label for="workspace_path">Workspace Path</label>
+              <input id="workspace_path" name="workspace_path" type="text" value="C:\\Github\\ai-cli-api" placeholder="C:\\Github\\ai-cli-api">
+            </div>
+
+            <div class="field" id="session-row">
+              <label for="provider_session_ref">Provider Session Ref</label>
+              <input id="provider_session_ref" name="provider_session_ref" type="text" placeholder="Required for resume mode">
+            </div>
+
+            <div class="field">
+              <label for="prompt">Prompt</label>
+              <textarea id="prompt" name="prompt" placeholder="Ask the selected CLI something simple first."></textarea>
+            </div>
+
+            <div class="actions">
+              <button class="primary" id="send-button" type="submit">Send Request</button>
+              <button class="secondary" id="refresh-button" type="button">Refresh Worker State</button>
+            </div>
+
+            <div class="meta" id="request-meta">Ready.</div>
+          </form>
+        </div>
+
+        <div class="panel response-card">
+          <div>
+            <h2>Response</h2>
+            <div class="pill-row">
+              <span class="pill">stream events: <strong id="event-count">0</strong></span>
+              <span class="pill">current session: <strong id="session-ref">none</strong></span>
+            </div>
+          </div>
+          <div class="console" id="console"></div>
+          <div>
+            <h2>Warm Workers</h2>
+            <div class="worker-grid" id="worker-list"></div>
+          </div>
+        </div>
+      </section>
+    </div>
+
+    <div id="tab-testlab" class="tab-panel">
+      <section class="panel" id="test-lab-section">
+        <h2>Test Lab</h2>
+        <div style="display:grid;grid-template-columns:1fr;gap:16px">
+          <div class="field">
+            <label for="test-story">Story (NEW prompt)</label>
+            <textarea id="test-story" rows="3" placeholder="Enter a story for the NEW prompt...">Hello my name is Eren and I am a fintech director managing PF, ATM and Transit. Also I have a grey car.</textarea>
+          </div>
+
+          <div>
+            <h3 style="margin:0 0 8px">Questions &amp; Expected Answers (RESUME steps)</h3>
+            <div id="test-qa-list"></div>
+            <div style="display:flex;gap:8px;margin-top:8px">
+              <button type="button" class="secondary" onclick="addQAPair()">+ Add Question</button>
+              <button type="button" class="magic-btn" onclick="generateScenario('all')">&#10024; Generate All Fields</button>
+            </div>
+          </div>
+
+          <div>
+            <h3 style="margin:0 0 8px">Models to Test</h3>
+            <div class="select-all-row">
+              <input type="checkbox" id="test-select-all" checked onchange="toggleAllTestModels(this.checked)">
+              <label for="test-select-all">Select All</label>
+            </div>
+            <div class="model-grid" id="test-model-grid"></div>
+          </div>
+
+          <div class="test-actions">
+            <button class="primary" id="run-test-btn" type="button" onclick="runTestLab()">Run Test</button>
+            <span class="meta" id="test-meta">Ready.</span>
+          </div>
+
+          <div class="test-results-wrap">
+            <table class="test-results-table" id="test-results-table">
+              <thead>
+                <tr>
+                  <th>#</th>
+                  <th>Provider</th>
+                  <th>Model</th>
+                  <th>New</th>
+                  <th>Resume</th>
+                  <th>Grade</th>
+                </tr>
+            </thead>
+            <tbody id="test-results-body"></tbody>
+          </table>
+        </div>
+        </div>
+      </section>
+    </div>
 
     <section class="panel">
       <h2>CLI Versions</h2>
@@ -742,58 +962,6 @@
         <span class="meta" id="version-meta">Not checked yet.</span>
       </div>
       <div class="version-grid" id="version-grid"></div>
-    </section>
-
-    <section class="panel" id="test-lab-section">
-      <div class="test-lab-header" onclick="toggleTestLab()">
-        <h2>Test Lab</h2>
-        <span class="test-lab-toggle" id="test-lab-toggle">&#9656;</span>
-      </div>
-      <div id="test-lab-body">
-        <div class="field">
-          <label for="test-story">Story (NEW prompt)</label>
-          <textarea id="test-story" rows="3" placeholder="Hello my name is Eren and I am a fintech director managing PF, ATM and Transit. Also I have a grey car."></textarea>
-        </div>
-
-        <div>
-          <h3 style="margin:0 0 8px">Questions &amp; Expected Answers (RESUME steps)</h3>
-          <div id="test-qa-list"></div>
-          <div style="display:flex;gap:8px;margin-top:8px">
-            <button type="button" class="secondary" onclick="addQAPair()">+ Add Question</button>
-            <button type="button" class="magic-btn" onclick="generateScenario('all')">&#10024; Generate All Fields</button>
-          </div>
-        </div>
-
-        <div>
-          <h3 style="margin:0 0 8px">Models to Test</h3>
-          <div class="select-all-row">
-            <input type="checkbox" id="test-select-all" checked onchange="toggleAllTestModels(this.checked)">
-            <label for="test-select-all">Select All</label>
-          </div>
-          <div class="model-grid" id="test-model-grid"></div>
-        </div>
-
-        <div class="test-actions">
-          <button class="primary" id="run-test-btn" type="button" onclick="runTestLab()">Run Test</button>
-          <span class="meta" id="test-meta">Ready.</span>
-        </div>
-
-        <div class="test-results-wrap">
-          <table class="test-results-table" id="test-results-table">
-            <thead>
-              <tr>
-                <th>#</th>
-                <th>Provider</th>
-                <th>Model</th>
-                <th>New</th>
-                <th>Resume</th>
-                <th>Grade</th>
-              </tr>
-            </thead>
-            <tbody id="test-results-body"></tbody>
-          </table>
-        </div>
-      </div>
     </section>
   </main>
 
@@ -866,11 +1034,27 @@
 
     function renderWorkers() {
       workerListEl.innerHTML = "";
-      for (const worker of workers) {
-        const chip = document.createElement("div");
-        chip.className = "worker-chip";
-        chip.innerHTML = `<strong>${worker.provider}/${worker.model}</strong> · ${worker.ready ? "ready" : "down"} · ${worker.busy ? "busy" : "idle"} · q=${worker.queue_length}`;
-        workerListEl.appendChild(chip);
+      const groups = {};
+      for (const w of workers) {
+        if (!groups[w.provider]) groups[w.provider] = [];
+        groups[w.provider].push(w);
+      }
+      for (const [provider, models] of Object.entries(groups)) {
+        const group = document.createElement("div");
+        group.className = "worker-group";
+        group.innerHTML = `<div class="worker-group-header">${provider} <span class="worker-group-count">(${models.length})</span></div>`;
+        const items = document.createElement("div");
+        items.className = "worker-group-items";
+        for (const w of models) {
+          const chip = document.createElement("div");
+          chip.className = "worker-chip";
+          const statusClass = w.ready ? "ok" : "error";
+          const statusText = `${w.ready ? "ready" : "down"} · ${w.busy ? "busy" : "idle"} · q=${w.queue_length}`;
+          chip.innerHTML = `<strong>${w.model}</strong> <span class="worker-status ${statusClass}">${statusText}</span>`;
+          items.appendChild(chip);
+        }
+        group.appendChild(items);
+        workerListEl.appendChild(group);
       }
     }
 
@@ -1169,8 +1353,6 @@
     const testResultsBody = document.getElementById("test-results-body");
     const testMetaEl = document.getElementById("test-meta");
     const runTestBtn = document.getElementById("run-test-btn");
-    const testLabToggle = document.getElementById("test-lab-toggle");
-    const testLabBody = document.getElementById("test-lab-body");
 
     function addQAPair(question = "", expected = "") {
       qaCounter++;
@@ -1215,20 +1397,43 @@
       return pairs;
     }
 
-    function toggleTestLab() {
-      const isHidden = testLabBody.style.display === "none" || testLabBody.style.display === "";
-      testLabBody.style.display = isHidden ? "grid" : "none";
-      testLabToggle.classList.toggle("open", isHidden);
+    function switchTab(tabName) {
+      for (const panel of document.querySelectorAll(".tab-panel")) {
+        panel.classList.toggle("active", panel.id === `tab-${tabName}`);
+      }
+      for (const btn of document.querySelectorAll(".tab-btn")) {
+        btn.classList.toggle("active", btn.dataset.tab === tabName);
+      }
     }
 
     function renderTestLabModels() {
       testModelGrid.innerHTML = "";
+      const groups = {};
       for (const w of workers) {
-        const id = `test-model-${w.provider}-${w.model}`;
-        const label = document.createElement("label");
-        label.innerHTML = `<input type="checkbox" id="${id}" data-provider="${w.provider}" data-model="${w.model}" checked> ${w.provider}/${w.model}`;
-        testModelGrid.appendChild(label);
+        if (!groups[w.provider]) groups[w.provider] = [];
+        groups[w.provider].push(w);
       }
+      for (const [provider, models] of Object.entries(groups)) {
+        const group = document.createElement("div");
+        group.className = "provider-group";
+
+        const header = document.createElement("div");
+        header.className = "provider-group-header";
+        header.innerHTML = `<input type="checkbox" checked data-provider-toggle="${provider}" onchange="toggleProviderModels('${provider}', this.checked)"> <span>${provider}</span> <span class="provider-count">(${models.length} models)</span>`;
+        group.appendChild(header);
+
+        const grid = document.createElement("div");
+        grid.className = "provider-group-models";
+        for (const w of models) {
+          const id = `test-model-${w.provider}-${w.model}`;
+          const label = document.createElement("label");
+          label.innerHTML = `<input type="checkbox" id="${id}" data-provider="${w.provider}" data-model="${w.model}" checked onchange="syncSelectAllState()"> ${w.model}`;
+          grid.appendChild(label);
+        }
+        group.appendChild(grid);
+        testModelGrid.appendChild(group);
+      }
+      syncSelectAllState();
     }
 
     function toggleAllTestModels(checked) {
@@ -1237,9 +1442,28 @@
       }
     }
 
+    function toggleProviderModels(provider, checked) {
+      for (const cb of testModelGrid.querySelectorAll(`input[data-provider="${provider}"]`)) {
+        cb.checked = checked;
+      }
+      syncSelectAllState();
+    }
+
+    function syncSelectAllState() {
+      const allModels = testModelGrid.querySelectorAll("input[data-provider][data-model]");
+      const allChecked = [...allModels].every(cb => cb.checked);
+      document.getElementById("test-select-all").checked = allChecked;
+
+      for (const toggle of testModelGrid.querySelectorAll("input[data-provider-toggle]")) {
+        const provider = toggle.dataset.providerToggle;
+        const providerCbs = testModelGrid.querySelectorAll(`input[data-provider="${provider}"][data-model]`);
+        toggle.checked = [...providerCbs].every(cb => cb.checked);
+      }
+    }
+
     function getSelectedTestModels() {
       const models = [];
-      for (const cb of testModelGrid.querySelectorAll("input[type=checkbox]:checked")) {
+      for (const cb of testModelGrid.querySelectorAll("input[data-provider][data-model]:checked")) {
         models.push({ provider: cb.dataset.provider, model: cb.dataset.model });
       }
       return models;

@@ -30,7 +30,8 @@ PACKAGE_REGISTRY: dict[str, CLIPackageInfo] = {
     "codex":   CLIPackageInfo(ProviderName.CODEX,   "npm", "@openai/codex"),
     "gemini":  CLIPackageInfo(ProviderName.GEMINI,  "npm", "@google/gemini-cli"),
     "kimi":    CLIPackageInfo(ProviderName.KIMI,    "uv",  "kimi-cli"),
-    "copilot": CLIPackageInfo(ProviderName.COPILOT, "npm", "@github/copilot"),
+    "copilot":  CLIPackageInfo(ProviderName.COPILOT,  "npm", "@github/copilot"),
+    "opencode": CLIPackageInfo(ProviderName.OPENCODE, "npm", "opencode-ai"),
 }
 
 
