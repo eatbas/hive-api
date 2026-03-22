@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import sys
 from pathlib import Path
 
 import pytest
@@ -9,12 +10,24 @@ from ai_cli_api.config import load_config
 from ai_cli_api.models import ProviderName
 
 
+def pytest_collection_modifyitems(items: list[pytest.Item]) -> None:
+    """Run Playwright UI tests last to avoid interfering with pytest-asyncio loops."""
+    ui_items: list[pytest.Item] = []
+    other_items: list[pytest.Item] = []
+    for item in items:
+        if item.nodeid.startswith("tests/ui_e2e/"):
+            ui_items.append(item)
+        else:
+            other_items.append(item)
+    items[:] = [*other_items, *ui_items]
+
+
 def make_wrapper(tmp_path: Path, provider: str) -> str:
     wrapper = tmp_path / f"{provider}.sh"
     fake_cli = Path(__file__).parent / "fakes" / "fake_cli.py"
     wrapper.write_text(
         "#!/usr/bin/env bash\n"
-        f'python "{fake_cli.as_posix()}" {provider} "$@"\n',
+        f'"{sys.executable}" "{fake_cli.as_posix()}" {provider} "$@"\n',
         encoding="utf-8",
     )
     os.chmod(wrapper, 0o755)
@@ -23,6 +36,10 @@ def make_wrapper(tmp_path: Path, provider: str) -> str:
 
 def make_config(tmp_path: Path) -> Path:
     providers = {provider.value: make_wrapper(tmp_path, provider.value) for provider in ProviderName}
+    escaped_providers = {
+        key: value.replace("\\", "\\\\")
+        for key, value in providers.items()
+    }
     config_path = tmp_path / "config.toml"
     config_path.write_text(
         f"""
@@ -35,37 +52,37 @@ path = ""
 
 [providers.gemini]
 enabled = true
-executable = "{providers['gemini'].replace('\\', '\\\\')}"
+executable = "{escaped_providers['gemini']}"
 models = ["gemini-2.5-flash", "gemini-2.5-pro"]
 default_options = {{ extra_args = [] }}
 
 [providers.codex]
 enabled = true
-executable = "{providers['codex'].replace('\\', '\\\\')}"
+executable = "{escaped_providers['codex']}"
 models = ["codex-5.3", "gpt-5.4-mini"]
 default_options = {{ extra_args = [] }}
 
 [providers.claude]
 enabled = true
-executable = "{providers['claude'].replace('\\', '\\\\')}"
+executable = "{escaped_providers['claude']}"
 models = ["sonnet", "opus"]
 default_options = {{ extra_args = [] }}
 
 [providers.kimi]
 enabled = true
-executable = "{providers['kimi'].replace('\\', '\\\\')}"
+executable = "{escaped_providers['kimi']}"
 models = ["default"]
 default_options = {{ extra_args = [] }}
 
 [providers.copilot]
 enabled = true
-executable = "{providers['copilot'].replace('\\', '\\\\')}"
+executable = "{escaped_providers['copilot']}"
 models = ["claude-sonnet-4.6"]
 default_options = {{ extra_args = [] }}
 
 [providers.opencode]
 enabled = true
-executable = "{providers['opencode'].replace('\\', '\\\\')}"
+executable = "{escaped_providers['opencode']}"
 models = ["glm-4.7-flash"]
 default_options = {{ extra_args = [] }}
 """.strip(),

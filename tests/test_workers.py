@@ -1,4 +1,5 @@
 import asyncio
+from pathlib import Path
 from unittest.mock import patch
 
 import pytest
@@ -7,11 +8,12 @@ from ai_cli_api.models import ChatMode, ChatRequest, ProviderName
 from ai_cli_api.worker import WorkerManager
 
 
-def _new_request(provider, model, prompt="hello", workspace="C:\\Github\\ai-cli-api"):
+def _new_request(provider, model, prompt="hello", workspace=None):
+    resolved_workspace = workspace or str(Path.cwd().resolve())
     return ChatRequest(
         provider=provider,
         model=model,
-        workspace_path=workspace,
+        workspace_path=resolved_workspace,
         mode=ChatMode.NEW,
         prompt=prompt,
         stream=False,
@@ -65,7 +67,7 @@ async def test_resume_rejects_model_change_in_same_runtime(loaded_config):
         resume_request = ChatRequest(
             provider=ProviderName.GEMINI,
             model="gemini-2.5-flash",
-            workspace_path="C:\\Github\\ai-cli-api",
+            workspace_path=str(Path.cwd().resolve()),
             mode=ChatMode.RESUME,
             prompt="again",
             provider_session_ref=result.provider_session_ref,

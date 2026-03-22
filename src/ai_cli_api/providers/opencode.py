@@ -31,8 +31,7 @@ class OpenCodeAdapter(ProviderAdapter):
         provider_options: dict[str, Any],
     ) -> CommandSpec:
         argv = [executable, "run", "--format", "json"]
-        if model != "default":
-            argv.extend(["--model", self._resolve_model(model)])
+        self._apply_model_override(argv, self._resolve_model(model))
         argv.extend(self._extra_args(provider_options))
         argv.append(prompt)
         return CommandSpec(argv=argv)
@@ -47,16 +46,14 @@ class OpenCodeAdapter(ProviderAdapter):
         provider_options: dict[str, Any],
     ) -> CommandSpec:
         argv = [executable, "run", "--format", "json", "--session", session_ref]
-        if model != "default":
-            argv.extend(["--model", self._resolve_model(model)])
+        self._apply_model_override(argv, self._resolve_model(model))
         argv.extend(self._extra_args(provider_options))
         argv.append(prompt)
         return CommandSpec(argv=argv, preset_session_ref=session_ref)
 
     def parse_output_line(self, line: str, state: ParseState) -> list[dict[str, Any]]:
-        obj = self._parse_json(line)
+        obj = self._parse_json_or_warn(line, state)
         if obj is None:
-            state.warnings.append(line)
             return []
 
         events: list[dict[str, Any]] = []

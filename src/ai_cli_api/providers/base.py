@@ -67,7 +67,8 @@ class ProviderAdapter:
                 model=model,
                 provider_options=provider_options,
             )
-        assert session_ref is not None
+        if session_ref is None:
+            raise ValueError("session_ref required for resume mode")
         return self.build_resume_command(
             executable=executable,
             prompt=prompt,
@@ -132,6 +133,17 @@ class ProviderAdapter:
         if not isinstance(raw, list) or any(not isinstance(item, str) for item in raw):
             raise ValueError("provider_options.extra_args must be a list of strings")
         return raw
+
+    def _apply_model_override(self, argv: list[str], model: str, *, flag: str = "--model") -> None:
+        if model != "default":
+            argv.extend([flag, model])
+
+    def _parse_json_or_warn(self, line: str, state: ParseState) -> dict[str, Any] | None:
+        obj = self._parse_json(line)
+        if obj is None:
+            state.warnings.append(line)
+            return None
+        return obj
 
     def _append_chunk(self, state: ParseState, chunk: str) -> list[dict[str, Any]]:
         text = chunk.strip()

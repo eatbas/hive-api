@@ -20,8 +20,7 @@ class CopilotAdapter(ProviderAdapter):
             "--no-ask-user",
             "--no-auto-update",
         ]
-        if model != "default":
-            argv.extend(["--model", model])
+        self._apply_model_override(argv, model)
         argv.extend(self._extra_args(provider_options))
         return CommandSpec(argv=argv)
 
@@ -38,15 +37,13 @@ class CopilotAdapter(ProviderAdapter):
             "--resume",
             session_ref,
         ]
-        if model != "default":
-            argv.extend(["--model", model])
+        self._apply_model_override(argv, model)
         argv.extend(self._extra_args(provider_options))
         return CommandSpec(argv=argv, preset_session_ref=session_ref)
 
     def parse_output_line(self, line: str, state: ParseState) -> list[dict[str, object]]:
-        obj = self._parse_json(line)
+        obj = self._parse_json_or_warn(line, state)
         if obj is None:
-            state.warnings.append(line)
             return []
 
         events: list[dict[str, object]] = []

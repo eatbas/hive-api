@@ -3,3 +3,10 @@ __pycache__/
 .venv/
 .pytest_cache/
 *.egg-info/
+.coverage
+playwright-report/
+test-results/
+
+# Local Claude skills
+.claude/skills/
+

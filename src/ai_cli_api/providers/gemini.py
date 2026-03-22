@@ -14,16 +14,14 @@ class GeminiAdapter(ProviderAdapter):
 
     def build_new_command(self, *, executable: str, prompt: str, model: str, provider_options: dict) -> CommandSpec:
         argv = [executable, "-p", prompt, "-o", "stream-json"]
-        if model != "default":
-            argv.extend(["-m", model])
+        self._apply_model_override(argv, model, flag="-m")
         argv.extend(self._extra_args(provider_options))
         return CommandSpec(argv=argv)
 
     def build_resume_command(self, *, executable: str, prompt: str, model: str, session_ref: str, provider_options: dict) -> CommandSpec:
         # Store UUID in preset_session_ref; make_shell_script maps it to an index at runtime.
         argv = [executable, "-p", prompt, "-o", "stream-json", "--resume", "__GEMINI_IDX__"]
-        if model != "default":
-            argv.extend(["-m", model])
+        self._apply_model_override(argv, model, flag="-m")
         argv.extend(self._extra_args(provider_options))
         return CommandSpec(argv=argv, preset_session_ref=session_ref)
 
@@ -58,9 +56,8 @@ class GeminiAdapter(ProviderAdapter):
         return super().make_shell_script(workspace_path, command)
 
     def parse_output_line(self, line: str, state: ParseState) -> list[dict[str, object]]:
-        obj = self._parse_json(line)
+        obj = self._parse_json_or_warn(line, state)
         if obj is None:
-            state.warnings.append(line)
             return []
 
         events: list[dict[str, object]] = []
