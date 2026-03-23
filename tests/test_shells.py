@@ -1,7 +1,9 @@
 import os
 from unittest.mock import patch
 
-from hive_api.shells import detect_bash_path, to_bash_path
+import pytest
+
+from hive_api.shells import GitBashNotFoundError, detect_bash_path, to_bash_path
 
 
 def test_to_bash_path_converts_windows_drive():
@@ -42,3 +44,17 @@ def test_detect_bash_path_windows_checks_git_bash():
         instance.exists.return_value = True
         result = detect_bash_path(None)
         assert "bash" in result.lower()
+
+
+def test_detect_bash_path_windows_raises_without_git_bash():
+    with patch("hive_api.shells.os") as mock_os, \
+         patch("hive_api.shells.Path") as mock_path_cls, \
+         patch("hive_api.shells.shutil") as mock_shutil:
+        mock_os.name = "nt"
+        # No candidate paths exist
+        instance = mock_path_cls.return_value
+        instance.exists.return_value = False
+        # shutil.which also returns nothing
+        mock_shutil.which.return_value = None
+        with pytest.raises(GitBashNotFoundError, match="Git Bash is required on Windows"):
+            detect_bash_path(None)

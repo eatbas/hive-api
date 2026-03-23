@@ -216,13 +216,13 @@ refreshButton.addEventListener("click", async () => {
   try { await refreshState(); setMeta("State refreshed."); } catch (error) { setMeta(error.message, true); } finally { refreshButton.disabled = false; }
 });
 
-checkUpdatesButton.addEventListener("click", async () => {
+export async function checkAllVersions() {
   checkUpdatesButton.disabled = true;
   versionMetaEl.textContent = "Checking providers...";
   try {
     const providers = await (await fetch("/v1/providers")).json();
-    const enabled = providers.filter((p) => p.enabled).map((p) => p.provider);
-    const results = await Promise.all(enabled.map(async (provider) => (await (await fetch(`/v1/cli-versions/${provider}/check`, { method: "POST" })).json())));
+    const available = providers.filter((p) => p.enabled && p.available).map((p) => p.provider);
+    const results = await Promise.all(available.map(async (provider) => (await (await fetch(`/v1/cli-versions/${provider}/check`, { method: "POST" })).json())));
     renderVersions(results.filter(Boolean));
     versionMetaEl.textContent = "Done.";
   } catch (error) {
@@ -230,7 +230,9 @@ checkUpdatesButton.addEventListener("click", async () => {
   } finally {
     checkUpdatesButton.disabled = false;
   }
-});
+}
+
+checkUpdatesButton.addEventListener("click", checkAllVersions);
 
 providerSelect.addEventListener("change", renderModelOptions);
 modeSelect.addEventListener("change", updateSessionVisibility);

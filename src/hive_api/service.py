@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import logging
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -18,6 +19,7 @@ from .routes import (
     testlab_router,
     updates_router,
 )
+from .shells import GitBashNotFoundError
 from .updater import CLIUpdater
 from .colony import Colony
 
@@ -46,7 +48,16 @@ OPENAPI_TAGS = [
 
 def create_app() -> FastAPI:
     config = load_config()
-    colony = Colony(config)
+
+    try:
+        colony = Colony(config)
+    except GitBashNotFoundError:
+        logger.critical(
+            "Git Bash is required on Windows but was not found. "
+            "Please install Git for Windows: https://git-scm.com/download/win"
+        )
+        raise
+
     updater = CLIUpdater(manager=colony, config=config.updater)
 
     @asynccontextmanager
@@ -61,6 +72,14 @@ def create_app() -> FastAPI:
             unavailable or "none",
             len(colony.drones),
         )
+
+        # Run the first version check before accepting requests so the UI
+        # has data immediately.  A generous timeout keeps startup fast even
+        # when npm or the network is slow.
+        try:
+            await asyncio.wait_for(updater.check_and_update_all(), timeout=30)
+        except Exception:
+            logger.warning("Initial CLI version check did not finish in time — continuing startup")
 
         updater.start()
         try:

@@ -167,15 +167,25 @@ async def test_health_details_reports_drone_errors(loaded_config):
 async def test_unavailable_provider_skips_drone_creation(loaded_config):
     """When a CLI is not found, no drones should be created for that provider."""
     import shutil
+    from pathlib import Path as _RealPath
 
     original_which = shutil.which
+    _original_is_file = _RealPath.is_file
 
     def _fake_which(cmd: str, **kwargs) -> str | None:  # type: ignore[override]
         if "claude" in str(cmd):
             return None
         return original_which(cmd, **kwargs)
 
-    with patch("hive_api.providers.base.shutil.which", side_effect=_fake_which):
+    def _fake_is_file(self: _RealPath) -> bool:
+        if "claude" in str(self):
+            return False
+        return _original_is_file(self)
+
+    with (
+        patch("hive_api.providers.base.shutil.which", side_effect=_fake_which),
+        patch("hive_api.providers.base.Path.is_file", _fake_is_file),
+    ):
         manager = Colony(loaded_config)
         await manager.start()
         try:

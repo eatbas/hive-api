@@ -5,6 +5,7 @@ import logging
 
 from ..config import AppConfig, ProviderConfig
 from ..models import ModelDetail, ProviderCapability, ProviderName, DroneInfo
+from ..providers.base import set_bash_path
 from ..providers.registry import build_provider_registry
 from ..shells import detect_bash_path
 from .drone import Drone
@@ -16,6 +17,8 @@ class Colony:
     def __init__(self, config: AppConfig):
         self.config = config
         self.shell_path = detect_bash_path(config.shell.path)
+        # Let the CLI smoke-test use the same Git Bash as the drones.
+        set_bash_path(self.shell_path)
         self.registry = build_provider_registry()
         self.drones: dict[tuple[ProviderName, str], Drone] = {}
         self.session_models: dict[tuple[ProviderName, str], str] = {}
@@ -57,6 +60,7 @@ class Colony:
                     shell_path=self.shell_path,
                     default_options=provider_config.default_options,
                     session_models=self.session_models,
+                    cli_timeout=provider_config.cli_timeout,
                 )
                 pending.append(((provider, model), drone))
             await asyncio.gather(*(w.start() for _, w in pending))
@@ -147,6 +151,7 @@ class Colony:
                     shell_path=self.shell_path,
                     default_options=provider_config.default_options,
                     session_models=self.session_models,
+                    cli_timeout=provider_config.cli_timeout,
                 )
                 await drone.start()
                 self.drones[(provider, model)] = drone

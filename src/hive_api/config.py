@@ -26,6 +26,7 @@ class ProviderConfig:
     executable: str | None = None
     models: list[str] = field(default_factory=lambda: ["default"])
     default_options: dict[str, Any] = field(default_factory=dict)
+    cli_timeout: float = 300.0  # seconds; 0 = no timeout
 
 
 @dataclass(slots=True)
@@ -52,6 +53,7 @@ def _provider_config(raw: dict[str, Any] | None) -> ProviderConfig:
         executable=(str(raw["executable"]).strip() or None) if raw.get("executable") is not None else None,
         models=models or ["default"],
         default_options=dict(raw.get("default_options", {})),
+        cli_timeout=float(raw.get("cli_timeout", 300.0)),
     )
 
 

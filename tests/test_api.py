@@ -1,6 +1,7 @@
 import os
 from fastapi.testclient import TestClient
 
+from hive_api.models import ProviderName
 from hive_api.service import create_app
 
 
@@ -19,6 +20,10 @@ def test_health_and_provider_endpoints(config_path):
         providers = client.get("/v1/providers")
         assert providers.status_code == 200
         assert len(providers.json()) == 6
+
+        all_providers = client.get("/v1/providers?all=true")
+        assert all_providers.status_code == 200
+        assert len(all_providers.json()) == 6
 
         drones = client.get("/v1/drones")
         assert drones.status_code == 200
@@ -97,6 +102,25 @@ def test_chat_opencode_json(config_path, tmp_path):
         assert payload["provider_session_ref"]
 
 
+def test_chat_returns_400_for_unavailable_provider(config_path, tmp_path):
+    app = create_app()
+    with TestClient(app) as client:
+        # Manually mark a provider as unavailable
+        colony = app.state.colony
+        colony.available_providers[ProviderName.CLAUDE] = False
+        body = {
+            "provider": "claude",
+            "model": "sonnet",
+            "workspace_path": str(tmp_path.resolve()),
+            "mode": "new",
+            "prompt": "hello",
+            "stream": False,
+        }
+        response = client.post("/v1/chat", json=body)
+        assert response.status_code == 400
+        assert "not available" in response.json()["detail"]
+
+
 def test_chat_returns_404_for_unknown_drone(config_path, tmp_path):
     app = create_app()
     with TestClient(app) as client:
@@ -160,7 +184,7 @@ def test_drones_endpoint_reflects_drone_state(config_path, tmp_path):
 def test_providers_endpoint_shows_capabilities(config_path):
     app = create_app()
     with TestClient(app) as client:
-        providers = client.get("/v1/providers").json()
+        providers = client.get("/v1/providers?all=true").json()
         for p in providers:
             assert "supports_resume" in p
             assert "supports_streaming" in p

@@ -1,23 +1,77 @@
 from __future__ import annotations
 
 import json
+import os
+import re
 import shlex
 import shutil
+import subprocess
 import uuid
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Any
 
 from ..models import ChatMode, ProviderName
 from ..shells import to_bash_path
 
 
-def check_cli_available(executable: str) -> bool:
-    """Return True if *executable* is found on PATH or at the given path.
+_VERSION_PATTERN = re.compile(r"\d+\.\d+")
 
-    Works for both bare command names (``'claude'``) and absolute paths
-    (``'/usr/local/bin/claude'``).
+# Will be set by Colony during startup so the smoke test runs through
+# the same Git Bash that drones use.
+_bash_path: str | None = None
+
+
+def set_bash_path(path: str) -> None:
+    """Called once at startup to configure the bash used for CLI smoke tests."""
+    global _bash_path  # noqa: PLW0603
+    _bash_path = path
+
+
+def check_cli_available(executable: str) -> bool:
+    """Return True if *executable* can actually be invoked **from Git Bash**.
+
+    * **Explicit paths** (containing a separator) — only checked for file
+      existence; they are invoked through a bash drone so a direct smoke-test
+      would fail for ``.sh`` wrappers on Windows.
+    * **Bare command names** — smoke-tested via Git Bash with
+      ``command -v <exe> && <exe> --version``.  This ensures we see exactly
+      what the drones will see — no Windows ``.cmd`` stubs that bash can't
+      find.
     """
+    # Explicit path → just check the file exists.
+    if os.sep in executable or "/" in executable:
+        return Path(executable).is_file()
+
+    bash = _bash_path
+    if bash:
+        # Run through Git Bash — same environment as drones.
+        return _check_via_bash(bash, executable)
+
+    # Fallback (non-Windows or bash not yet configured).
     return shutil.which(executable) is not None
+
+
+def _check_via_bash(bash: str, executable: str) -> bool:
+    """Run ``<exe> --version`` inside Git Bash and verify the output."""
+    script = f'command -v {shlex.quote(executable)} >/dev/null 2>&1 && {shlex.quote(executable)} --version 2>&1'
+    try:
+        kwargs: dict[str, object] = {}
+        if os.name == "nt":
+            kwargs["creationflags"] = subprocess.CREATE_NO_WINDOW  # type: ignore[attr-defined]
+        result = subprocess.run(
+            [bash, "-c", script],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            timeout=10,
+            **kwargs,
+        )
+        if result.returncode != 0:
+            return False
+        output = result.stdout.decode("utf-8", errors="replace")
+        return bool(_VERSION_PATTERN.search(output))
+    except (OSError, subprocess.TimeoutExpired, FileNotFoundError):
+        return False
 
 
 @dataclass(slots=True)

@@ -99,13 +99,18 @@ HOST="${HIVE_API_HOST:-127.0.0.1}"
 PORT="${HIVE_API_PORT:-8000}"
 
 echo "Checking CLI availability..."
+FOUND_COUNT=0
 for cli in claude gemini codex kimi copilot opencode; do
   if command -v "$cli" &>/dev/null; then
-    echo "  $cli: $(command -v "$cli")"
-  else
-    echo "  $cli: not found"
+    echo "  ✓ $cli: $(command -v "$cli")"
+    FOUND_COUNT=$((FOUND_COUNT + 1))
   fi
 done
+if [ "$FOUND_COUNT" -eq 0 ]; then
+  echo "  No CLI providers found. Install at least one (claude, codex, gemini, etc.)."
+  exit 1
+fi
+echo "  ($FOUND_COUNT provider(s) available)"
 echo ""
 
 echo "Starting Hive on http://${HOST}:${PORT}"

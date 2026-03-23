@@ -20,6 +20,7 @@ class Drone:
         shell_path: str,
         default_options: dict[str, Any],
         session_models: dict[tuple[ProviderName, str], str],
+        cli_timeout: float = 300.0,
     ) -> None:
         self.provider = provider
         self.model = model
@@ -28,6 +29,7 @@ class Drone:
         self.shell_backend = shell_path
         self.default_options = default_options
         self.session_models = session_models
+        self.cli_timeout = cli_timeout or 0.0
         self.shell = BashSession(shell_path)
         self.queue: asyncio.Queue[tuple[ChatRequest, JobHandle]] = asyncio.Queue()
         self.busy = False
@@ -154,7 +156,22 @@ class Drone:
                 await handle.publish(event)
 
         script = self.adapter.make_shell_script(request.workspace_path, command)
-        exit_code = await self.shell.run_script(script, on_line)
+        timeout = self.cli_timeout if self.cli_timeout > 0 else None
+        try:
+            exit_code = await asyncio.wait_for(
+                self.shell.run_script(script, on_line),
+                timeout=timeout,
+            )
+        except asyncio.TimeoutError:
+            await self.shell.interrupt()
+            await asyncio.sleep(0.5)
+            # If bash is still alive, forcibly restart it
+            if self.shell.process and self.shell.process.returncode is None:
+                await self.shell.stop()
+                await self.shell.start()
+            raise ShellSessionError(
+                f"{self.provider.value} CLI timed out after {self.cli_timeout:.0f}s"
+            )
 
         final_text = "\n".join(parse_state.output_chunks).strip()
         response = ChatResponse(

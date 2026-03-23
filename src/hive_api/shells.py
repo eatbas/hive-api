@@ -17,6 +17,16 @@ class ShellSessionError(RuntimeError):
     pass
 
 
+class GitBashNotFoundError(RuntimeError):
+    """Raised on Windows when Git Bash cannot be located."""
+
+    def __init__(self) -> None:
+        super().__init__(
+            "Git Bash is required on Windows but was not found. "
+            "Please install Git for Windows: https://git-scm.com/download/win"
+        )
+
+
 @dataclass(slots=True)
 class _ActiveRun:
     token: str
@@ -34,6 +44,12 @@ def to_bash_path(value: str) -> str:
 
 
 def detect_bash_path(override: str | None = None) -> str:
+    """Resolve the bash executable path.
+
+    On non-Windows platforms any ``bash`` on *PATH* is acceptable.
+    On Windows **Git Bash** is required — raises :class:`GitBashNotFoundError`
+    when it cannot be located.
+    """
     if override:
         return override
     if os.name != "nt":
@@ -46,7 +62,12 @@ def detect_bash_path(override: str | None = None) -> str:
     for candidate in candidates:
         if Path(candidate).exists():
             return candidate
-    return shutil.which("bash") or "bash"
+
+    found = shutil.which("bash")
+    if found:
+        return found
+
+    raise GitBashNotFoundError()
 
 
 class BashSession:
@@ -95,6 +116,15 @@ class BashSession:
         await process.wait()
         if self._reader_task:
             await self._reader_task
+
+    async def interrupt(self) -> None:
+        """Send Ctrl-C to the running bash process to cancel the current command."""
+        if self.process and self.process.stdin and not self.process.stdin.is_closing():
+            self.process.stdin.write(b"\x03\n")
+            try:
+                await self.process.stdin.drain()
+            except ConnectionResetError:
+                pass
 
     async def run_script(self, script: str, on_line: Callable[[str], Awaitable[None]]) -> int:
         await self.ensure_started()

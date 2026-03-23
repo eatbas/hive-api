@@ -3,8 +3,8 @@
   "configurations": [
     {
       "name": "api",
-      "runtimeExecutable": ".venv/bin/python",
-      "runtimeArgs": ["-m", "uvicorn", "hive_api.main:app", "--host", "127.0.0.1", "--port", "8001", "--reload"],
+      "runtimeExecutable": ".venv/Scripts/pythonw.exe",
+      "runtimeArgs": ["-m", "uvicorn", "hive_api.main:app", "--host", "127.0.0.1", "--port", "8001"],
       "port": 8001
     }
   ]

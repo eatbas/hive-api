@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import os
+import shlex
 import subprocess
 from collections.abc import Awaitable, Callable
 
@@ -15,25 +16,48 @@ _CMD_TIMEOUT = 60
 
 RunCmd = Callable[..., Awaitable[tuple[int, str]]]
 
+# Set once at startup by CLIUpdater so the subprocess fallback routes
+# through Git Bash instead of cmd.exe / PowerShell on Windows.
+_bash_path: str | None = None
 
-async def run_cmd(*args: str, timeout: int = _CMD_TIMEOUT) -> tuple[int, str]:
-    kwargs: dict[str, int] = {}
+
+def set_bash_path(path: str) -> None:
+    global _bash_path  # noqa: PLW0603
+    _bash_path = path
+
+
+def _run_cmd_sync(*args: str, timeout: int = _CMD_TIMEOUT) -> tuple[int, str]:
+    """Blocking subprocess helper — always routes through Git Bash on Windows."""
+    kwargs: dict[str, object] = {}
     if os.name == "nt":
         kwargs["creationflags"] = subprocess.CREATE_NO_WINDOW
+
+    # On Windows, wrap the command in a Git Bash invocation so we never
+    # fall back to cmd.exe / PowerShell.
+    if os.name == "nt" and _bash_path:
+        script = " ".join(shlex.quote(a) for a in args)
+        cmd: tuple[str, ...] | tuple[str, ...] = (_bash_path, "-c", script)
+    else:
+        cmd = args
+
     try:
-        proc = await asyncio.create_subprocess_exec(
-            *args,
-            stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.STDOUT,
+        result = subprocess.run(
+            cmd,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            timeout=timeout,
             **kwargs,
         )
-        stdout_bytes, _ = await asyncio.wait_for(proc.communicate(), timeout=timeout)
-        return proc.returncode or 0, stdout_bytes.decode("utf-8", errors="replace").strip()
-    except asyncio.TimeoutError:
+        return result.returncode, result.stdout.decode("utf-8", errors="replace").strip()
+    except subprocess.TimeoutExpired:
         logger.warning("Command timed out: %s", " ".join(args))
         return -1, ""
     except FileNotFoundError:
         return -1, ""
+
+
+async def run_cmd(*args: str, timeout: int = _CMD_TIMEOUT) -> tuple[int, str]:
+    return await asyncio.to_thread(_run_cmd_sync, *args, timeout=timeout)
 
 
 async def get_current_version(

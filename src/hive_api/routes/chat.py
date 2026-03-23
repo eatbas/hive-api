@@ -35,6 +35,16 @@ async def _stream_handle_events(handle: JobHandle) -> AsyncIterator[str]:
 )
 async def chat(request: Request, body: ChatRequest) -> StreamingResponse | JSONResponse:
     colony = get_colony(request)
+
+    if not colony.available_providers.get(body.provider, False):
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                f"Provider '{body.provider.value}' is not available. "
+                f"The CLI is not installed or was not found on PATH."
+            ),
+        )
+
     drone = colony.get_drone(body.provider, body.model)
     if drone is None:
         raise HTTPException(

@@ -13,6 +13,7 @@ from .version_checker import (
     get_current_version,
     get_latest_version,
     run_cmd,
+    set_bash_path,
 )
 
 logger = logging.getLogger("hive_api.updater")
@@ -26,6 +27,8 @@ class CLIUpdater:
         self.config = config
         self._last_results: list[CLIVersionStatus] = []
         self._task: asyncio.Task[None] | None = None
+        # Ensure the subprocess fallback also uses Git Bash.
+        set_bash_path(manager.shell_path)
 
     async def _run_cmd(self, *args: str, timeout: int = 60) -> tuple[int, str]:
         return await run_cmd(*args, timeout=timeout)
@@ -181,7 +184,12 @@ class CLIUpdater:
         now = datetime.now(timezone.utc).isoformat()
         next_check = self._next_check_at()
 
-        providers = [p for p in self.manager.config.providers if self.manager.config.providers[p].enabled]
+        providers = [
+            p
+            for p in self.manager.config.providers
+            if self.manager.config.providers[p].enabled
+            and self.manager.available_providers.get(p, False)
+        ]
         check_results = await asyncio.gather(*(self._check_single_provider(p, now, next_check) for p in providers))
         results = [r for r in check_results if r is not None]
         self._last_results = results

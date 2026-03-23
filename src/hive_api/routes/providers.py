@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from fastapi import APIRouter, Request
+from fastapi import APIRouter, Query, Request
 
 from ..models import ModelDetail, ProviderCapability, DroneInfo
 from ._deps import get_colony
@@ -12,10 +12,17 @@ router = APIRouter()
     "/v1/providers",
     tags=["Providers"],
     summary="List provider capabilities",
+    description="Returns only providers whose CLI is installed and available. Pass `?all=true` to include unavailable ones.",
     response_model=list[ProviderCapability],
 )
-async def providers(request: Request) -> list[ProviderCapability]:
-    return get_colony(request).capabilities()
+async def providers(
+    request: Request,
+    all: bool = Query(False, description="Include unavailable providers"),
+) -> list[ProviderCapability]:
+    caps = get_colony(request).capabilities()
+    if all:
+        return caps
+    return [c for c in caps if c.available]
 
 
 @router.get(
