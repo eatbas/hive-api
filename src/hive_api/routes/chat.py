@@ -47,7 +47,7 @@ async def chat(request: Request, body: ChatRequest) -> StreamingResponse | JSONR
             ),
         )
 
-    drone = colony.get_drone(body.provider, body.model)
+    drone = await colony.acquire_drone(body.provider, body.model)
     if drone is None:
         raise HTTPException(
             status_code=404,

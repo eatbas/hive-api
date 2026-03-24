@@ -71,7 +71,7 @@ def create_app() -> FastAPI:
             "CLI availability: available=%s, unavailable=%s, drones=%d",
             available or "none",
             unavailable or "none",
-            len(colony.drones),
+            len(colony._all_drones()),
         )
 
         # Run the first version check before accepting requests so the UI
@@ -124,8 +124,8 @@ def create_app() -> FastAPI:
             config_path=str(config.config_path),
             shell_path=colony.shell_path,
             bash_version=bash_version,
-            drones_booted=all(drone.ready for drone in colony.drones.values()) if colony.drones else False,
-            drone_count=len(colony.drones),
+            drones_booted=all(drone.ready for drone in colony._all_drones()) if colony.drones else False,
+            drone_count=len(colony._all_drones()),
             details=details,
         )
 

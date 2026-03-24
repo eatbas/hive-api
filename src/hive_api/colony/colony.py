@@ -24,10 +24,14 @@ class Colony:
         # Let the CLI smoke-test use the same Git Bash as the drones.
         set_bash_path(self.shell_path)
         self.registry = build_provider_registry()
-        self.drones: dict[tuple[ProviderName, str], Drone] = {}
+        self.drones: dict[tuple[ProviderName, str], list[Drone]] = {}
         self.session_models: dict[tuple[ProviderName, str], str] = {}
         self.available_providers: dict[ProviderName, bool] = {}
         self._jobs: dict[str, JobHandle] = {}
+
+    def _all_drones(self) -> list[Drone]:
+        """Return a flat list of every drone across all pools."""
+        return [drone for pool in self.drones.values() for drone in pool]
 
     async def start(self) -> None:
         for provider, provider_config in self.config.providers.items():
@@ -70,13 +74,72 @@ class Colony:
                 pending.append(((provider, model), drone))
             await asyncio.gather(*(w.start() for _, w in pending))
             for key, w in pending:
-                self.drones[key] = w
+                self.drones.setdefault(key, []).append(w)
 
     async def stop(self) -> None:
-        await asyncio.gather(*(drone.stop() for drone in self.drones.values()), return_exceptions=True)
+        await asyncio.gather(
+            *(drone.stop() for drone in self._all_drones()),
+            return_exceptions=True,
+        )
 
     def get_drone(self, provider: ProviderName, model: str) -> Drone | None:
-        return self.drones.get((provider, model))
+        """Return the primary drone for a (provider, model) pair.
+
+        For backward compatibility this is synchronous and always returns the
+        first drone in the pool.  Use :meth:`acquire_drone` in the request
+        hot-path to benefit from concurrent drone scaling.
+        """
+        pool = self.drones.get((provider, model))
+        if not pool:
+            return None
+        return pool[0]
+
+    async def acquire_drone(self, provider: ProviderName, model: str) -> Drone | None:
+        """Acquire the least-busy drone, scaling the pool lazily if needed.
+
+        1. Return an idle drone from the pool if one exists.
+        2. If all drones are busy and the pool is below *concurrency*, spawn a
+           new drone and return it.
+        3. Otherwise return the drone with the smallest queue.
+        """
+        key = (provider, model)
+        pool = self.drones.get(key)
+        if not pool:
+            return None
+
+        # Prefer an idle drone.
+        for drone in pool:
+            if drone.ready and not drone.busy and drone.queue.qsize() == 0:
+                return drone
+
+        # All busy — scale up if under the concurrency limit.
+        provider_config = self.config.providers.get(provider)
+        max_pool = provider_config.concurrency if provider_config else 1
+        if len(pool) < max_pool:
+            template = pool[0]
+            new_drone = Drone(
+                provider=provider,
+                model=model,
+                adapter=template.adapter,
+                executable=template.executable,
+                shell_path=template.shell_backend,
+                default_options=template.default_options,
+                session_models=self.session_models,
+                cli_timeout=template.cli_timeout,
+            )
+            await new_drone.start()
+            pool.append(new_drone)
+            logger.info(
+                "Scaled drone pool %s/%s to %d (max %d)",
+                provider.value,
+                model,
+                len(pool),
+                max_pool,
+            )
+            return new_drone
+
+        # Pool full — return the least-loaded drone.
+        return min(pool, key=lambda d: d.queue.qsize())
 
     # ------------------------------------------------------------------
     # Job registry
@@ -119,7 +182,7 @@ class Colony:
 
     def _find_drone_for_job(self, handle: JobHandle) -> Drone | None:
         """Find the drone currently executing the given job."""
-        for drone in self.drones.values():
+        for drone in self._all_drones():
             if drone._current_handle is handle:
                 return drone
         return None
@@ -158,18 +221,23 @@ class Colony:
 
     def model_details(self) -> list[ModelDetail]:
         details: list[ModelDetail] = []
-        for (provider, model), drone in self.drones.items():
-            adapter = self.registry[provider]
+        seen: set[tuple[ProviderName, str]] = set()
+        for drone in self._all_drones():
+            key = (drone.provider, drone.model)
+            if key in seen:
+                continue
+            seen.add(key)
+            adapter = self.registry[drone.provider]
             details.append(
                 ModelDetail(
-                    provider=provider,
-                    model=model,
+                    provider=drone.provider,
+                    model=drone.model,
                     ready=drone.ready,
                     busy=drone.busy,
                     supports_resume=adapter.supports_resume,
                     chat_request_example={
-                        "provider": provider.value,
-                        "model": model,
+                        "provider": drone.provider.value,
+                        "model": drone.model,
                         "workspace_path": "/path/to/your/project",
                         "mode": "new",
                         "prompt": "Your prompt here",
@@ -180,10 +248,10 @@ class Colony:
         return details
 
     def drone_info(self) -> list[DroneInfo]:
-        return [drone.info() for drone in self.drones.values()]
+        return [drone.info() for drone in self._all_drones()]
 
     def drones_for_provider(self, provider: ProviderName) -> list[Drone]:
-        return [w for (p, _), w in self.drones.items() if p == provider]
+        return [drone for drone in self._all_drones() if drone.provider == provider]
 
     async def restart_provider(self, provider: ProviderName) -> None:
         drones = self.drones_for_provider(provider)
@@ -218,7 +286,7 @@ class Colony:
                     cli_timeout=provider_config.cli_timeout,
                 )
                 await drone.start()
-                self.drones[(provider, model)] = drone
+                self.drones[(provider, model)] = [drone]
         return True
 
     def get_idle_drone(self, provider: ProviderName) -> Drone | None:
@@ -228,7 +296,7 @@ class Colony:
         return None
 
     async def get_bash_version(self) -> str | None:
-        for drone in self.drones.values():
+        for drone in self._all_drones():
             if drone.ready and not drone.busy and drone.queue.qsize() == 0:
                 try:
                     _, output = await drone.run_quick_command("bash --version | head -1\n__hive_exit=0")
@@ -239,7 +307,7 @@ class Colony:
 
     def health_details(self) -> list[str]:
         details: list[str] = []
-        for drone in self.drones.values():
+        for drone in self._all_drones():
             if drone.last_error:
                 details.append(f"{drone.provider.value}/{drone.model}: {drone.last_error}")
         return details
