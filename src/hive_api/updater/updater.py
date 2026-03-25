@@ -7,7 +7,7 @@ from datetime import datetime, timedelta, timezone
 from ..config import UpdaterConfig
 from ..models import CLIVersionStatus, ProviderName
 from ..colony import Colony
-from .registry import CLIPackageInfo, PACKAGE_REGISTRY, needs_update as _needs_update
+from .registry import CLIPackageInfo, PACKAGE_REGISTRY, detect_install_method, needs_update as _needs_update
 from .single_provider import update_single_provider_impl
 from .version_checker import (
     get_current_version,
@@ -50,12 +50,22 @@ class CLIUpdater:
             return True
         return all(not drone.busy and drone.queue.qsize() == 0 for drone in drones)
 
-    async def update_cli(self, pkg_info: CLIPackageInfo) -> bool:
-        logger.info("Updating %s (%s) ...", pkg_info.package, pkg_info.manager)
+    async def update_cli(self, pkg_info: CLIPackageInfo, *, executable: str | None = None) -> bool:
+        # Detect whether the active binary was installed via npm/uv or a
+        # native standalone installer (e.g. ~/.local/share/claude/versions/).
+        method = pkg_info.manager
+        if executable:
+            detected = detect_install_method(executable)
+            if detected != "unknown":
+                method = detected
 
-        if pkg_info.manager == "npm":
+        logger.info("Updating %s (method=%s) ...", pkg_info.package, method)
+
+        if method == "native":
+            cmd_str = f"{executable} update 2>&1\n__hive_exit=$?"
+        elif method == "npm":
             cmd_str = f"npm install -g {pkg_info.package}@latest 2>&1\n__hive_exit=$?"
-        elif pkg_info.manager == "uv":
+        elif method == "uv":
             cmd_str = f"uv tool upgrade {pkg_info.package} --no-cache 2>&1\n__hive_exit=$?"
         else:
             return False
@@ -77,9 +87,11 @@ class CLIUpdater:
             except Exception:
                 logger.debug("Shell update failed for %s, falling back to subprocess", pkg_info.package)
 
-        if pkg_info.manager == "npm":
+        if method == "native":
+            code, output = await self._run_cmd(executable or pkg_info.package, "update", timeout=120)
+        elif method == "npm":
             code, output = await self._run_cmd("npm", "install", "-g", f"{pkg_info.package}@latest", timeout=120)
-        elif pkg_info.manager == "uv":
+        elif method == "uv":
             code, output = await self._run_cmd("uv", "tool", "upgrade", pkg_info.package, "--no-cache", timeout=120)
         else:
             return False
@@ -145,7 +157,7 @@ class CLIUpdater:
 
         if update_needed and self.config.auto_update:
             if self.is_provider_idle(provider):
-                success = await self.update_cli(pkg_info)
+                success = await self.update_cli(pkg_info, executable=executable or adapter.default_executable)
                 if success:
                     await self.manager.restart_provider(provider)
                     await self.manager.activate_provider(provider)

@@ -56,17 +56,29 @@ async def test_verify(request: TestVerifyRequest) -> TestVerifyResponse:
 @router.post(
     "/v1/test/generate-scenario",
     summary="AI-generate a test scenario",
+    description=(
+        "Uses a drone to AI-generate test scenario content (story + QA pairs). "
+        "Optionally specify `provider` and `model` to target a specific drone; "
+        "when omitted the cheapest available model is chosen automatically "
+        "(Claude Haiku → Codex GPT-5.4-mini)."
+    ),
     response_model=TestGenerateResponse,
     responses={503: {"description": "No cheap model drone is available.", "model": ErrorDetail}},
 )
 async def test_generate_scenario(request: Request, body: TestGenerateRequest) -> TestGenerateResponse:
     colony = get_colony(request)
+
+    # Honour explicit provider/model from the UI dropdown; fall back to
+    # the cheapest available model when the user selects "auto".
     drone = None
-    for provider, model in _CHEAPEST_MODELS:
-        candidate = colony.get_drone(provider, model)
-        if candidate is not None and candidate.ready:
-            drone = candidate
-            break
+    if body.provider and body.model:
+        drone = await colony.acquire_drone(body.provider, body.model)
+    if drone is None:
+        for provider, model in _CHEAPEST_MODELS:
+            candidate = await colony.acquire_drone(provider, model)
+            if candidate is not None and candidate.ready:
+                drone = candidate
+                break
     if drone is None:
         raise HTTPException(
             status_code=503,

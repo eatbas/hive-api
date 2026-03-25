@@ -56,7 +56,8 @@ def test_codex_resume_command_uses_json_and_full_auto():
         session_ref="thread-1",
         provider_options={},
     )
-    assert command.argv[:4] == ["codex", "exec", "resume", "--json"]
+    assert command.argv[:3] == ["codex", "exec", "resume"]
+    assert "--json" in command.argv
     assert "--full-auto" in command.argv
 
 

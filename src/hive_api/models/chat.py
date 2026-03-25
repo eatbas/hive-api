@@ -36,7 +36,11 @@ class ChatRequest(BaseModel):
     )
     provider_options: dict[str, Any] = Field(
         default_factory=dict,
-        description="Provider-specific passthrough options. Common key: extra_args (list[str]).",
+        description=(
+            "Provider-specific passthrough options. "
+            "Common keys: extra_args (list[str]) for raw CLI flags; "
+            "effort ('low'|'medium'|'high') and max_turns (int) for Claude."
+        ),
     )
 
     model_config = ConfigDict(

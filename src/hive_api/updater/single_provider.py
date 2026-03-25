@@ -57,16 +57,15 @@ async def update_single_provider_impl(updater: "CLIUpdater", provider: ProviderN
     current = await updater.get_current_version(executable or adapter.default_executable, provider)
     latest = await updater.get_latest_version(pkg_info)
 
-    if not updater.is_provider_idle(provider):
+    if not _needs_update(current, latest):
         result = updater._build_status(
             provider=provider,
             executable=executable,
             current_version=current,
             latest_version=latest,
-            needs_update=_needs_update(current, latest),
+            needs_update=False,
             now=now,
             next_check=next_check,
-            skip_reason="drones busy",
         )
         updater._cache_single(result)
         return result
@@ -74,7 +73,10 @@ async def update_single_provider_impl(updater: "CLIUpdater", provider: ProviderN
     skip_reason: str | None = None
     last_updated: str | None = None
 
-    success = await updater.update_cli(pkg_info)
+    # Manual update: always attempt even if drones are busy.
+    # update_cli() falls back to subprocess when no idle drone is available.
+    resolved_exe = executable or adapter.default_executable
+    success = await updater.update_cli(pkg_info, executable=resolved_exe)
     if success:
         await updater.manager.restart_provider(provider)
         await updater.manager.activate_provider(provider)

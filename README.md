@@ -56,6 +56,8 @@ enabled = true
 executable = ""            # auto-detect from PATH
 models = ["opus", "sonnet", "haiku"]
 default_options = { extra_args = [] }
+cli_timeout = 0            # seconds; 0 = no timeout
+concurrency = 4            # max concurrent drones per model
 
 [updater]
 enabled = true
@@ -65,7 +67,9 @@ auto_update = true
 
 - `models` — Each string becomes a drone. The value is passed to the provider CLI `--model` flag.
 - `executable` — Leave empty to auto-detect from PATH, or set an absolute path.
-- `default_options.extra_args` — Allowlisted escape hatch for provider-specific flags.
+- `default_options.extra_args` — Raw CLI flags appended to every command for this provider.
+- `cli_timeout` — Maximum seconds a single CLI invocation may run. `0` means no timeout.
+- `concurrency` — Maximum drone instances per model. Pools scale lazily from 1 up to this limit.
 - `updater` — Controls automatic CLI version checking and updates.
 
 ## API
@@ -130,6 +134,14 @@ Sends a prompt to a provider. Supports streaming (SSE) and JSON response modes.
 }
 ```
 
+**Provider options** — per-request overrides passed through to the CLI:
+
+| Key | Providers | Description |
+|-----|-----------|-------------|
+| `extra_args` | All | Raw CLI flags appended to the command (list of strings). |
+| `effort` | Claude | Reasoning effort: `"low"`, `"medium"`, or `"high"`. Omit for CLI default (medium). |
+| `max_turns` | Claude | Maximum autonomous tool-use turns (integer as string). Omit for CLI default. |
+
 **SSE events** (when `stream: true`):
 
 | Event               | Description                            |
@@ -173,12 +185,23 @@ Verifies test results across multiple models using keyword matching. A model rec
 
 #### `POST /v1/test/generate-scenario`
 
-Uses the cheapest available model (Claude Haiku or GPT-5.4-mini) to AI-generate test scenario content. Set `field` to `"story"`, `"questions"`, `"expected"`, or `"all"`.
+AI-generates test scenario content (story + QA pairs). By default uses the cheapest available model (Claude Haiku → Codex GPT-5.4-mini). Optionally specify `provider` and `model` to target a specific drone.
 
+**Auto (cheapest):**
 ```json
 {
   "field": "all",
   "workspace_path": "C:\\Github\\hive-api"
+}
+```
+
+**Explicit model:**
+```json
+{
+  "field": "all",
+  "workspace_path": "/home/user/project",
+  "provider": "codex",
+  "model": "gpt-5.4-mini"
 }
 ```
 

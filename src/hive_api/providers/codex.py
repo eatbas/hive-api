@@ -13,14 +13,14 @@ class CodexAdapter(ProviderAdapter):
     }
 
     def build_new_command(self, *, executable: str, prompt: str, model: str, provider_options: dict) -> CommandSpec:
-        argv = [executable, "exec", "--json", "--full-auto", "--search"]
+        argv = [executable, "exec", "--json", "--full-auto"]
         self._apply_model_override(argv, self._resolve_model(model), flag="-m")
         argv.extend(self._extra_args(provider_options))
         argv.append(prompt)
         return CommandSpec(argv=argv)
 
     def build_resume_command(self, *, executable: str, prompt: str, model: str, session_ref: str, provider_options: dict) -> CommandSpec:
-        argv = [executable, "exec", "resume", "--json", "--full-auto", "--search"]
+        argv = [executable, "exec", "resume", "--json", "--full-auto"]
         self._apply_model_override(argv, self._resolve_model(model), flag="-m")
         argv.extend(self._extra_args(provider_options))
         argv.extend([session_ref, prompt])

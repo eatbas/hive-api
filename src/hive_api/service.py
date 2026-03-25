@@ -30,9 +30,19 @@ UI_STATIC_DIR = Path(__file__).with_name("ui") / "static"
 API_DESCRIPTION = """\
 Hive API — a coordinated collective of AI coding CLIs (Gemini, Codex, Claude, Kimi, Copilot, OpenCode).
 
-The API maintains persistent drones for configured provider/model pairs,
+The API maintains persistent drone pools for configured provider/model pairs,
 enabling low-latency prompt execution without cold-start overhead.
+Pools scale lazily up to the per-provider `concurrency` limit.
+
 Running jobs can be stopped via `POST /v1/chat/{job_id}/stop`.
+
+**Provider options** — per-request overrides via `provider_options`:
+
+| Key | Providers | Description |
+|-----|-----------|-------------|
+| `extra_args` | All | Raw CLI flags appended to the command. |
+| `effort` | Claude | Reasoning effort (`low`, `medium`, `high`). Omit for CLI default. |
+| `max_turns` | Claude | Maximum autonomous tool-use turns. Omit for CLI default. |
 """
 
 OPENAPI_TAGS = [

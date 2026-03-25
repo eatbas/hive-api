@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import os
 import re
+import shutil
 from dataclasses import dataclass
 
 from ..models import ProviderName
@@ -32,6 +34,25 @@ def _parse_version(text: str) -> str | None:
 
 def _version_tuple(version: str) -> tuple[int, ...]:
     return tuple(int(part) for part in version.split("."))
+
+
+def detect_install_method(executable: str) -> str:
+    """Detect how a CLI was installed from its resolved binary path.
+
+    Returns ``"native"`` for standalone installers that live under
+    ``~/.local/share/<name>/versions/``, ``"npm"`` when the resolved
+    path traverses a ``node_modules`` directory, or the *fallback*
+    value (defaults to ``"unknown"``) otherwise.
+    """
+    full_path = shutil.which(executable)
+    if full_path is None:
+        return "unknown"
+    resolved = os.path.realpath(full_path)
+    if "node_modules" in resolved:
+        return "npm"
+    if os.sep.join((".local", "share")) in resolved and "versions" in resolved:
+        return "native"
+    return "unknown"
 
 
 def needs_update(current: str | None, latest: str | None) -> bool:

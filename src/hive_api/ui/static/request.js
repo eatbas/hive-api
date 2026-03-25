@@ -131,19 +131,42 @@ function renderVersions(versions) {
 async function fetchVersions() { const response = await fetch("/v1/cli-versions"); return await response.json(); }
 
 async function updateProvider(provider) {
-  const btn = versionGridEl.querySelector(`.version-update-btn[data-provider="${provider}"]`);
-  if (btn) { btn.disabled = true; btn.textContent = "Updating…"; }
+  const card = versionGridEl.querySelector(`.version-card[data-provider="${provider}"]`);
+  const btn = card?.querySelector(".version-update-btn");
+  if (!card || !btn) return;
+
+  // Replace button with progress bar.
+  btn.replaceWith(Object.assign(document.createElement("div"), {
+    className: "version-progress", innerHTML: '<div class="version-progress-bar"></div>',
+  }));
+  const statusEl = document.createElement("div");
+  statusEl.className = "version-status";
+  statusEl.textContent = "Updating…";
+  card.appendChild(statusEl);
+  versionMetaEl.textContent = `Updating ${provider}…`;
+
   try {
     const response = await fetch(`/v1/cli-versions/${provider}/update`, { method: "POST" });
     const result = await response.json();
     if (!response.ok) throw new Error(result.detail || "Update failed");
-    // Replace just this provider's card with the updated result.
-    const oldCard = versionGridEl.querySelector(`.version-card[data-provider="${provider}"]`);
+
+    // Snap progress to 100% briefly before replacing the card.
+    const bar = card.querySelector(".version-progress-bar");
+    if (bar) { bar.style.animation = "none"; bar.style.width = "100%"; }
+    statusEl.textContent = result.update_skipped_reason ? result.update_skipped_reason : "Done!";
+    await new Promise((r) => setTimeout(r, 400));
+
     const newCard = buildVersionCard(result);
-    if (oldCard) oldCard.replaceWith(newCard); else versionGridEl.appendChild(newCard);
-    versionMetaEl.textContent = `${provider} updated to ${result.current_version || "latest"}.`;
+    card.replaceWith(newCard);
+    if (result.update_skipped_reason) {
+      versionMetaEl.textContent = `${provider}: ${result.update_skipped_reason}`;
+    } else {
+      versionMetaEl.textContent = `${provider} updated to ${result.current_version || "latest"}.`;
+    }
   } catch (error) {
-    if (btn) { btn.textContent = "Retry"; btn.disabled = false; }
+    const bar = card.querySelector(".version-progress-bar");
+    if (bar) { bar.style.animation = "none"; bar.style.width = "100%"; bar.style.background = "var(--error)"; }
+    statusEl.textContent = error.message;
     versionMetaEl.textContent = error.message;
   }
 }

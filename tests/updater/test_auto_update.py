@@ -145,7 +145,7 @@ class TestUpdateSingleProvider:
             ) as mock_latest, patch.object(checker, "update_cli", new_callable=AsyncMock) as mock_update, patch.object(
                 manager, "restart_provider", new_callable=AsyncMock
             ):
-                mock_curr.return_value = "1.1.0"
+                mock_curr.return_value = "1.0.0"
                 mock_latest.return_value = "1.1.0"
                 mock_update.return_value = True
                 result = await checker.update_single_provider(ProviderName.CLAUDE)
@@ -155,7 +155,27 @@ class TestUpdateSingleProvider:
             await manager.stop()
 
     @pytest.mark.asyncio()
+    async def test_force_update_already_up_to_date(self, loaded_config):
+        """Manual update returns early when already on latest version."""
+        manager = Colony(loaded_config)
+        await manager.start()
+        try:
+            checker = CLIUpdater(manager=manager, config=UpdaterConfig(enabled=True, interval_hours=4.0, auto_update=False))
+            with patch.object(checker, "get_current_version", new_callable=AsyncMock) as mock_curr, patch.object(
+                checker, "get_latest_version", new_callable=AsyncMock
+            ) as mock_latest, patch.object(checker, "update_cli", new_callable=AsyncMock) as mock_update:
+                mock_curr.return_value = "1.1.0"
+                mock_latest.return_value = "1.1.0"
+                result = await checker.update_single_provider(ProviderName.CLAUDE)
+                assert result.provider == ProviderName.CLAUDE
+                assert not result.needs_update
+                mock_update.assert_not_called()
+        finally:
+            await manager.stop()
+
+    @pytest.mark.asyncio()
     async def test_force_update_busy_drones(self, loaded_config):
+        """Manual update proceeds even when drones are busy (subprocess fallback)."""
         manager = Colony(loaded_config)
         await manager.start()
         try:
@@ -163,11 +183,15 @@ class TestUpdateSingleProvider:
             manager.drones_for_provider(ProviderName.CLAUDE)[0].busy = True
             with patch.object(checker, "get_current_version", new_callable=AsyncMock) as mock_curr, patch.object(
                 checker, "get_latest_version", new_callable=AsyncMock
-            ) as mock_latest:
+            ) as mock_latest, patch.object(checker, "update_cli", new_callable=AsyncMock) as mock_update, patch.object(
+                manager, "restart_provider", new_callable=AsyncMock
+            ):
                 mock_curr.return_value = "1.0.0"
                 mock_latest.return_value = "1.1.0"
+                mock_update.return_value = True
                 result = await checker.update_single_provider(ProviderName.CLAUDE)
-                assert result.update_skipped_reason == "drones busy"
+                assert result.update_skipped_reason is None
+                assert mock_update.call_count == 1
         finally:
             await manager.stop()
 

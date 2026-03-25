@@ -66,10 +66,21 @@ class TestGenerateRequest(BaseModel):
         min_length=1,
         description="Absolute path to the workspace directory passed to the CLI.",
     )
+    provider: ProviderName | None = Field(
+        default=None,
+        description="Override the provider to use for generation. When absent the cheapest available model is chosen.",
+    )
+    model: str | None = Field(
+        default=None,
+        description="Override the model to use for generation. Requires 'provider' to be set.",
+    )
 
     model_config = ConfigDict(
         json_schema_extra={
-            "examples": [{"field": "all", "workspace_path": "C:\\Github\\hive-api"}]
+            "examples": [
+                {"field": "all", "workspace_path": "C:\\Github\\hive-api"},
+                {"field": "all", "workspace_path": "/home/user/project", "provider": "codex", "model": "gpt-5.4-mini"},
+            ]
         }
     )
 

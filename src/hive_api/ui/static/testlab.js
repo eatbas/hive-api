@@ -12,15 +12,15 @@ const generateModelSelect = document.getElementById("generate-model-select");
 const selectAll = document.getElementById("test-select-all");
 
 let qaCounter = 0;
+let generateController = null;
+const generateBtnDefaultHTML = generateAllBtn.innerHTML;
 
 function setTestMeta(msg, isError = false) {
   testMetaEl.textContent = msg;
   testMetaEl.className = isError ? "meta error" : "meta";
 }
 
-function clearTestResults() {
-  testResultsBody.innerHTML = "";
-}
+function clearTestResults() { testResultsBody.innerHTML = ""; }
 
 export function addQAPair(question = "", expected = "") {
   qaCounter += 1;
@@ -38,11 +38,9 @@ export function addQAPair(question = "", expected = "") {
 }
 
 function renumberQA() {
-  let i = 1;
-  for (const row of testQAList.querySelectorAll(".test-qa-row")) {
-    row.querySelector("label").textContent = `Question ${i}`;
-    i += 1;
-  }
+  testQAList.querySelectorAll(".test-qa-row").forEach((row, i) => {
+    row.querySelector("label").textContent = `Question ${i + 1}`;
+  });
 }
 
 function getQAPairs() {
@@ -58,8 +56,6 @@ function getQAPairs() {
   }
   return pairs;
 }
-
-// ---- Select All / Per-Provider toggles ----
 
 function syncSelectAllState() {
   const allModels = testModelGrid.querySelectorAll("input[data-provider][data-model]");
@@ -80,14 +76,9 @@ function toggleProvider(provider, checked) {
 }
 
 function getSelectedTestModels() {
-  const models = [];
-  for (const cb of testModelGrid.querySelectorAll("input[data-provider][data-model]:checked")) {
-    models.push({ provider: cb.dataset.provider, model: cb.dataset.model });
-  }
-  return models;
+  return [...testModelGrid.querySelectorAll("input[data-provider][data-model]:checked")]
+    .map((cb) => ({ provider: cb.dataset.provider, model: cb.dataset.model }));
 }
-
-// ---- Results table ----
 
 const SPINNER_HTML = '<span class="spinner"></span>';
 
@@ -109,10 +100,17 @@ function updateCell(row, col, value, className = "") {
   cell.className = className;
 }
 
-// ---- Generate scenario ----
-
 async function generateScenario() {
-  generateAllBtn.disabled = true;
+  if (generateController) {
+    generateController.abort();
+    generateController = null;
+    generateAllBtn.innerHTML = generateBtnDefaultHTML;
+    setTestMeta("Generation cancelled.");
+    return;
+  }
+
+  generateController = new AbortController();
+  generateAllBtn.innerHTML = "Cancel Generation";
   setTestMeta("Generating scenario...");
   try {
     const payload = { field: "all", workspace_path: getWorkspaceInput().value.trim() };
@@ -126,6 +124,7 @@ async function generateScenario() {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
+      signal: generateController.signal,
     });
     const data = await response.json();
     if (!response.ok) throw new Error(data.detail || `HTTP ${response.status}`);
@@ -137,13 +136,13 @@ async function generateScenario() {
     }
     setTestMeta("Scenario generated.");
   } catch (error) {
+    if (error.name === "AbortError") return;
     setTestMeta(error.message, true);
   } finally {
-    generateAllBtn.disabled = false;
+    generateController = null;
+    generateAllBtn.innerHTML = generateBtnDefaultHTML;
   }
 }
-
-// ---- Render model grid + generate model selector ----
 
 export function renderTestLabModels() {
   testModelGrid.innerHTML = "";
@@ -183,7 +182,6 @@ export function renderTestLabModels() {
   }
   syncSelectAllState();
 
-  // Populate generate model selector
   generateModelSelect.innerHTML = '<option value="auto">Auto (cheapest)</option>';
   for (const w of drones) {
     if (w.ready) {
@@ -194,8 +192,6 @@ export function renderTestLabModels() {
     }
   }
 }
-
-// ---- Run test ----
 
 async function testSingleModel(selected, workspace, story, qaPairs) {
   const row = getOrCreateRow(selected.provider, selected.model);
@@ -219,7 +215,6 @@ async function testSingleModel(selected, workspace, story, qaPairs) {
     if (newOk && newData.provider_session_ref) {
       const resumeCell = row.querySelector('[data-col="resume"]');
       resumeCell.innerHTML = `<div class="resume-progress"><span>${SPINNER_HTML} 0/${qaPairs.length}</span><div class="resume-bar-track"><div class="resume-bar-fill" style="width:0%"></div></div></div>`;
-      // Resume calls must be sequential per model (same session).
       let completed = 0;
       for (const qa of qaPairs) {
         const resumeResp = await fetch("/v1/chat", {
@@ -272,12 +267,8 @@ export async function runTestLab() {
 
   runTestBtn.disabled = true;
   clearTestResults();
-
-  // Pre-create all rows so they appear immediately.
   for (const s of selectedModels) getOrCreateRow(s.provider, s.model);
   setTestMeta(`Running ${selectedModels.length} models in parallel...`);
-
-  // Launch all models in parallel; resume calls within each model stay sequential.
   let doneCount = 0;
   const promises = selectedModels.map((selected) =>
     testSingleModel(selected, workspace, story, qaPairs).then((pass) => {
@@ -292,8 +283,6 @@ export async function runTestLab() {
   setTestMeta(`Done: ${passCount}/${selectedModels.length} PASS.`);
   runTestBtn.disabled = false;
 }
-
-// ---- Event listeners ----
 
 addQABtn.addEventListener("click", () => addQAPair());
 generateAllBtn.addEventListener("click", generateScenario);
