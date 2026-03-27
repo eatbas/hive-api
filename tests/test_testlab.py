@@ -42,7 +42,7 @@ def test_verify_keyword_miss(config_path, tmp_path):
             "items": [
                 {
                     "provider": "gemini",
-                    "model": "gemini-2.5-flash",
+                    "model": "gemini-3-flash-preview",
                     "new_exit_code": 0,
                     "resume_text": "You manage PF and ATM.",
                     "resume_exit_code": 0,

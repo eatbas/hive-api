@@ -26,7 +26,7 @@ async def test_colony_boots_all_drones(loaded_config):
     await manager.start()
     try:
         drones = manager.drone_info()
-        assert len(drones) == 9
+        assert len(drones) == 11
         assert all(drone.ready for drone in drones)
     finally:
         await manager.stop()
@@ -56,17 +56,17 @@ async def test_resume_rejects_model_change_in_same_runtime(loaded_config):
     manager = Colony(loaded_config)
     await manager.start()
     try:
-        drone = manager.get_drone(ProviderName.GEMINI, "gemini-2.5-pro")
+        drone = manager.get_drone(ProviderName.GEMINI, "gemini-3.1-pro-preview")
         assert drone is not None
-        handle = await drone.submit(_new_request(ProviderName.GEMINI, "gemini-2.5-pro"))
+        handle = await drone.submit(_new_request(ProviderName.GEMINI, "gemini-3.1-pro-preview"))
         result = await handle.result_future
         assert result.provider_session_ref == "gemini-session-new"
 
-        alt_drone = manager.get_drone(ProviderName.GEMINI, "gemini-2.5-flash")
+        alt_drone = manager.get_drone(ProviderName.GEMINI, "gemini-3-flash-preview")
         assert alt_drone is not None
         resume_request = ChatRequest(
             provider=ProviderName.GEMINI,
-            model="gemini-2.5-flash",
+            model="gemini-3-flash-preview",
             workspace_path=str(Path.cwd().resolve()),
             mode=ChatMode.RESUME,
             prompt="again",
@@ -194,7 +194,7 @@ async def test_unavailable_provider_skips_drone_creation(loaded_config):
             assert manager.available_providers[ProviderName.CLAUDE] is False
 
             # Other providers should still have drones
-            assert manager.get_drone(ProviderName.GEMINI, "gemini-2.5-flash") is not None
+            assert manager.get_drone(ProviderName.GEMINI, "gemini-3-flash-preview") is not None
             assert manager.available_providers[ProviderName.GEMINI] is True
 
             # capabilities() should report available=False for claude

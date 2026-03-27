@@ -53,7 +53,7 @@ path = ""
 [providers.gemini]
 enabled = true
 executable = "{escaped_providers['gemini']}"
-models = ["gemini-2.5-flash", "gemini-2.5-pro"]
+models = ["gemini-3.1-pro-preview", "gemini-3-flash-preview", "gemini-3.1-flash-lite-preview"]
 default_options = {{ extra_args = [] }}
 
 [providers.codex]
@@ -83,7 +83,7 @@ default_options = {{ extra_args = [] }}
 [providers.opencode]
 enabled = true
 executable = "{escaped_providers['opencode']}"
-models = ["glm-4.7-flash"]
+models = ["glm-4.7-flash", "glm-5.1"]
 default_options = {{ extra_args = [] }}
 """.strip(),
         encoding="utf-8",

@@ -30,7 +30,7 @@ class TestStreamingRequest:
 
     def test_gemini_streaming_request(self, console_page: Page, tmp_path):
         console_page.select_option("#provider", "gemini")
-        console_page.select_option("#model", "gemini-2.5-flash")
+        console_page.select_option("#model", "gemini-3-flash-preview")
         console_page.fill("#workspace_path", str(tmp_path.resolve()))
         console_page.fill("#prompt", "hello gemini")
         console_page.click("#send-button")
