@@ -35,3 +35,20 @@ class JobHandle:
 
     async def publish(self, event: dict[str, Any]) -> None:
         await self.events.put(event)
+
+    def publish_nowait(self, event: dict[str, Any]) -> None:
+        """Non-blocking publish; silently drops the event if the queue is full."""
+        try:
+            self.events.put_nowait(event)
+        except asyncio.QueueFull:
+            pass
+
+
+def stopped_event(handle: JobHandle) -> dict[str, Any]:
+    """Build a terminal 'stopped' SSE event for the given handle."""
+    return {
+        "type": "stopped",
+        "job_id": handle.job_id,
+        "provider": handle.provider.value if handle.provider else None,
+        "model": handle.model,
+    }

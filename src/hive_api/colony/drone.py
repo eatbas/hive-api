@@ -188,6 +188,8 @@ class Drone:
             await handle.publish({"type": "provider_session", "provider_session_ref": parse_state.session_ref})
 
         async def on_line(line: str) -> None:
+            if handle.cancelled.is_set():
+                return
             for event in self.adapter.parse_output_line(line, parse_state):
                 await handle.publish(event)
 

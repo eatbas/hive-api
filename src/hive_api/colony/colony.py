@@ -10,7 +10,7 @@ from ..providers.base import set_bash_path
 from ..providers.registry import build_provider_registry
 from ..shells import JobCancelledError, detect_bash_path
 from .drone import Drone
-from .handle import JobHandle
+from .handle import JobHandle, stopped_event
 
 logger = logging.getLogger("hive_api.colony")
 
@@ -170,9 +170,11 @@ class Colony:
             if drone is not None:
                 asyncio.create_task(drone.shell.interrupt())
             handle.status = JobStatus.STOPPED
+            handle.publish_nowait(stopped_event(handle))
 
         elif handle.status == JobStatus.QUEUED:
             handle.status = JobStatus.STOPPED
+            handle.publish_nowait(stopped_event(handle))
             if handle.result_future and not handle.result_future.done():
                 handle.result_future.set_exception(
                     JobCancelledError(f"Job {job_id} cancelled while queued")
