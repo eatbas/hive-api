@@ -1,6 +1,6 @@
-from hive_api.models import ChatMode
-from hive_api.providers.base import ParseState
-from hive_api.providers.copilot import CopilotAdapter
+from symphony.models import ChatMode
+from symphony.providers.base import ParseState
+from symphony.providers.copilot import CopilotAdapter
 
 
 def test_copilot_new_command_includes_required_flags():

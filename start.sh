@@ -95,8 +95,8 @@ fi
 # ---------------------------------------------------------------------------
 # Check CLI availability
 # ---------------------------------------------------------------------------
-HOST="${HIVE_API_HOST:-127.0.0.1}"
-PORT="${HIVE_API_PORT:-8000}"
+HOST="${SYMPHONY_HOST:-127.0.0.1}"
+PORT="${SYMPHONY_PORT:-8000}"
 
 echo "Checking CLI availability..."
 FOUND_COUNT=0
@@ -113,5 +113,5 @@ fi
 echo "  ($FOUND_COUNT provider(s) available)"
 echo ""
 
-echo "Starting Hive on http://${HOST}:${PORT}"
-exec python -m uvicorn hive_api.main:app --host "$HOST" --port "$PORT"
+echo "Starting Symphony on http://${HOST}:${PORT}"
+exec python -m uvicorn symphony.main:app --host "$HOST" --port "$PORT"

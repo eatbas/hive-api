@@ -1,8 +1,8 @@
 import os
 from fastapi.testclient import TestClient
 
-from hive_api.models import ProviderName
-from hive_api.service import create_app
+from symphony.models import InstrumentName
+from symphony.service import create_app
 
 
 def test_health_and_provider_endpoints(config_path):
@@ -10,12 +10,12 @@ def test_health_and_provider_endpoints(config_path):
     with TestClient(app) as client:
         index = client.get("/")
         assert index.status_code == 200
-        assert "Hive Console" in index.text
+        assert "Symphony Console" in index.text
 
         health = client.get("/health")
         assert health.status_code == 200
         payload = health.json()
-        assert payload["drone_count"] == 9
+        assert payload["musician_count"] == 9
 
         providers = client.get("/v1/providers")
         assert providers.status_code == 200
@@ -25,9 +25,9 @@ def test_health_and_provider_endpoints(config_path):
         assert all_providers.status_code == 200
         assert len(all_providers.json()) == 6
 
-        drones = client.get("/v1/drones")
-        assert drones.status_code == 200
-        assert len(drones.json()) == 9
+        musicians = client.get("/v1/musicians")
+        assert musicians.status_code == 200
+        assert len(musicians.json()) == 9
 
 
 def test_chat_json_and_streaming(config_path, tmp_path):
@@ -124,8 +124,8 @@ def test_chat_returns_400_for_unavailable_provider(config_path, tmp_path):
     app = create_app()
     with TestClient(app) as client:
         # Manually mark a provider as unavailable
-        colony = app.state.colony
-        colony.available_providers[ProviderName.CLAUDE] = False
+        orchestra = app.state.orchestra
+        orchestra.available_providers[InstrumentName.CLAUDE] = False
         body = {
             "provider": "claude",
             "model": "sonnet",
@@ -139,7 +139,7 @@ def test_chat_returns_400_for_unavailable_provider(config_path, tmp_path):
         assert "not available" in response.json()["detail"]
 
 
-def test_chat_returns_404_for_unknown_drone(config_path, tmp_path):
+def test_chat_returns_404_for_unknown_musician(config_path, tmp_path):
     app = create_app()
     with TestClient(app) as client:
         body = {
@@ -184,19 +184,19 @@ def test_chat_rejects_relative_workspace_path(config_path):
         assert response.status_code == 422
 
 
-def test_drones_endpoint_reflects_drone_state(config_path, tmp_path):
+def test_musicians_endpoint_reflects_musician_state(config_path, tmp_path):
     app = create_app()
     with TestClient(app) as client:
-        drones = client.get("/v1/drones").json()
-        providers_seen = {w["provider"] for w in drones}
+        musicians = client.get("/v1/musicians").json()
+        providers_seen = {m["provider"] for m in musicians}
         assert "claude" in providers_seen
         assert "gemini" in providers_seen
         assert "codex" in providers_seen
         assert "kimi" in providers_seen
         assert "copilot" in providers_seen
         assert "opencode" in providers_seen
-        assert all(w["ready"] for w in drones)
-        assert all(not w["busy"] for w in drones)
+        assert all(m["ready"] for m in musicians)
+        assert all(not m["busy"] for m in musicians)
 
 
 def test_providers_endpoint_shows_capabilities(config_path):
@@ -267,7 +267,7 @@ def test_no_persistent_state_files_created(config_path, tmp_path):
             assert not list(tmp_path.rglob(ext)), f"Found unexpected {ext} files"
 
 
-def test_stop_returns_404_for_unknown_job(config_path):
+def test_stop_returns_404_for_unknown_score(config_path):
     app = create_app()
     with TestClient(app) as client:
         response = client.post("/v1/chat/nonexistent-id/stop")
@@ -275,7 +275,7 @@ def test_stop_returns_404_for_unknown_job(config_path):
         assert "not found" in response.json()["detail"]
 
 
-def test_stop_completed_job_is_idempotent(config_path, tmp_path):
+def test_stop_completed_score_is_idempotent(config_path, tmp_path):
     app = create_app()
     with TestClient(app) as client:
         body = {
@@ -288,17 +288,17 @@ def test_stop_completed_job_is_idempotent(config_path, tmp_path):
         }
         response = client.post("/v1/chat", json=body)
         assert response.status_code == 200
-        job_id = response.json()["job_id"]
-        assert job_id
+        score_id = response.json()["score_id"]
+        assert score_id
 
-        stop_response = client.post(f"/v1/chat/{job_id}/stop")
+        stop_response = client.post(f"/v1/chat/{score_id}/stop")
         assert stop_response.status_code == 200
         payload = stop_response.json()
-        assert payload["job_id"] == job_id
+        assert payload["score_id"] == score_id
         assert payload["status"] in ("completed", "failed", "stopped")
 
 
-def test_chat_response_includes_job_id(config_path, tmp_path):
+def test_chat_response_includes_score_id(config_path, tmp_path):
     app = create_app()
     with TestClient(app) as client:
         body = {
@@ -312,11 +312,11 @@ def test_chat_response_includes_job_id(config_path, tmp_path):
         response = client.post("/v1/chat", json=body)
         assert response.status_code == 200
         payload = response.json()
-        assert "job_id" in payload
-        assert payload["job_id"]
+        assert "score_id" in payload
+        assert payload["score_id"]
 
 
-def test_streaming_includes_job_id_in_run_started(config_path, tmp_path):
+def test_streaming_includes_score_id_in_run_started(config_path, tmp_path):
     app = create_app()
     with TestClient(app) as client:
         body = {
@@ -331,4 +331,4 @@ def test_streaming_includes_job_id_in_run_started(config_path, tmp_path):
             assert stream_response.status_code == 200
             text = "".join(stream_response.iter_text())
         assert "event: run_started" in text
-        assert "job_id" in text
+        assert "score_id" in text

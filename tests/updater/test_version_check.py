@@ -4,16 +4,16 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 
-from hive_api.config import UpdaterConfig
-from hive_api.models import ProviderName
-from hive_api.updater import (
+from symphony.config import UpdaterConfig
+from symphony.models import InstrumentName
+from symphony.updater import (
     CLIPackageInfo,
     CLIUpdater,
     PACKAGE_REGISTRY,
     _parse_version,
     _version_tuple,
 )
-from hive_api.colony import Colony
+from symphony.orchestra import Orchestra
 
 
 class TestParseVersion:
@@ -75,12 +75,12 @@ class TestPackageRegistry:
         info = PACKAGE_REGISTRY["opencode"]
         assert info.manager == "npm"
         assert info.package == "opencode-ai"
-        assert info.provider == ProviderName.OPENCODE
+        assert info.provider == InstrumentName.OPENCODE
 
 
 @pytest.fixture()
 def updater(loaded_config):
-    manager = Colony(loaded_config)
+    manager = Orchestra(loaded_config)
     config = UpdaterConfig(enabled=True, interval_hours=4.0, auto_update=True)
     return CLIUpdater(manager=manager, config=config)
 
@@ -105,7 +105,7 @@ class TestGetCurrentVersion:
 class TestGetLatestVersion:
     @pytest.mark.asyncio()
     async def test_npm_package(self, updater):
-        pkg = CLIPackageInfo(ProviderName.CLAUDE, "npm", "@anthropic-ai/claude-code")
+        pkg = CLIPackageInfo(InstrumentName.CLAUDE, "npm", "@anthropic-ai/claude-code")
         with patch.object(updater, "_run_cmd", new_callable=AsyncMock) as mock_cmd:
             mock_cmd.return_value = (0, "1.0.17\n")
             version = await updater.get_latest_version(pkg)
@@ -114,7 +114,7 @@ class TestGetLatestVersion:
 
     @pytest.mark.asyncio()
     async def test_uv_package(self, updater):
-        pkg = CLIPackageInfo(ProviderName.KIMI, "uv", "kimi-cli")
+        pkg = CLIPackageInfo(InstrumentName.KIMI, "uv", "kimi-cli")
         with patch.object(updater, "_run_cmd", new_callable=AsyncMock) as mock_cmd:
             mock_cmd.return_value = (0, "kimi-cli v1.2.0\n- kimi\nother-tool v0.1.0\n")
             version = await updater.get_latest_version(pkg)
@@ -122,7 +122,7 @@ class TestGetLatestVersion:
 
     @pytest.mark.asyncio()
     async def test_uv_package_not_found(self, updater):
-        pkg = CLIPackageInfo(ProviderName.KIMI, "uv", "kimi-cli")
+        pkg = CLIPackageInfo(InstrumentName.KIMI, "uv", "kimi-cli")
         with patch.object(updater, "_run_cmd", new_callable=AsyncMock) as mock_cmd:
             mock_cmd.return_value = (0, "other-tool v0.1.0\n")
             version = await updater.get_latest_version(pkg)
@@ -130,7 +130,7 @@ class TestGetLatestVersion:
 
     @pytest.mark.asyncio()
     async def test_npm_failure(self, updater):
-        pkg = CLIPackageInfo(ProviderName.CLAUDE, "npm", "@anthropic-ai/claude-code")
+        pkg = CLIPackageInfo(InstrumentName.CLAUDE, "npm", "@anthropic-ai/claude-code")
         with patch.object(updater, "_run_cmd", new_callable=AsyncMock) as mock_cmd:
             mock_cmd.return_value = (1, "npm ERR!")
             version = await updater.get_latest_version(pkg)
@@ -139,17 +139,17 @@ class TestGetLatestVersion:
 
 class TestIsProviderIdle:
     @pytest.mark.asyncio()
-    async def test_idle_when_no_drones(self, updater):
-        assert updater.is_provider_idle(ProviderName.CLAUDE) is True
+    async def test_idle_when_no_musicians(self, updater):
+        assert updater.is_provider_idle(InstrumentName.CLAUDE) is True
 
     @pytest.mark.asyncio()
-    async def test_idle_when_drones_not_busy(self, loaded_config):
-        manager = Colony(loaded_config)
+    async def test_idle_when_musicians_not_busy(self, loaded_config):
+        manager = Orchestra(loaded_config)
         await manager.start()
         try:
             config = UpdaterConfig(enabled=True, interval_hours=4.0, auto_update=True)
             checker = CLIUpdater(manager=manager, config=config)
-            assert checker.is_provider_idle(ProviderName.CLAUDE) is True
+            assert checker.is_provider_idle(InstrumentName.CLAUDE) is True
         finally:
             await manager.stop()
 
@@ -157,7 +157,7 @@ class TestIsProviderIdle:
 class TestAPIEndpoints:
     def test_cli_versions_returns_empty_initially(self, config_path):
         from fastapi.testclient import TestClient
-        from hive_api.service import create_app
+        from symphony.service import create_app
 
         app = create_app()
         with TestClient(app) as client:
@@ -167,12 +167,12 @@ class TestAPIEndpoints:
 
     def test_cli_versions_check_returns_results(self, config_path):
         from fastapi.testclient import TestClient
-        from hive_api.service import create_app
+        from symphony.service import create_app
 
         app = create_app()
         with TestClient(app) as client:
-            with patch("hive_api.updater.updater.CLIUpdater.get_current_version", new_callable=AsyncMock) as mock_curr, patch(
-                "hive_api.updater.updater.CLIUpdater.get_latest_version", new_callable=AsyncMock
+            with patch("symphony.updater.updater.CLIUpdater.get_current_version", new_callable=AsyncMock) as mock_curr, patch(
+                "symphony.updater.updater.CLIUpdater.get_latest_version", new_callable=AsyncMock
             ) as mock_latest:
                 mock_curr.return_value = "1.0.0"
                 mock_latest.return_value = "1.0.0"

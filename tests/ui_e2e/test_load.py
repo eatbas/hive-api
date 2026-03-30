@@ -5,27 +5,27 @@ from playwright.sync_api import Page, expect
 
 class TestPageLoad:
     def test_title(self, console_page: Page):
-        expect(console_page).to_have_title("Hive Console")
+        expect(console_page).to_have_title("Symphony Console")
 
     def test_hero_heading_visible(self, console_page: Page):
         heading = console_page.locator("h1")
         expect(heading).to_be_visible()
-        expect(heading).to_contain_text("Command your AI colony from the hive")
+        expect(heading).to_contain_text("Conduct your AI orchestra from the podium")
 
     def test_health_status_ok(self, console_page: Page):
         status = console_page.locator("#health-status")
         expect(status).to_have_text("ok")
 
-    def test_drone_count(self, console_page: Page):
-        count = console_page.locator("#drone-count")
+    def test_musician_count(self, console_page: Page):
+        count = console_page.locator("#musician-count")
         expect(count).to_have_text("9")
 
-    def test_all_drones_shown(self, console_page: Page):
-        chips = console_page.locator(".drone-chip")
+    def test_all_musicians_shown(self, console_page: Page):
+        chips = console_page.locator(".musician-chip")
         expect(chips).to_have_count(9)
 
-    def test_all_drones_ready(self, console_page: Page):
-        chips = console_page.locator(".drone-chip")
+    def test_all_musicians_ready(self, console_page: Page):
+        chips = console_page.locator(".musician-chip")
         for i in range(chips.count()):
             expect(chips.nth(i)).to_contain_text("ready")
 

@@ -1,6 +1,6 @@
-from hive_api.models import ChatMode
-from hive_api.providers.base import ParseState
-from hive_api.providers.codex import CodexAdapter
+from symphony.models import ChatMode
+from symphony.providers.base import ParseState
+from symphony.providers.codex import CodexAdapter
 
 
 def test_codex_new_command_includes_full_auto():

@@ -6,8 +6,8 @@ from pathlib import Path
 
 import pytest
 
-from hive_api.config import load_config
-from hive_api.models import ProviderName
+from symphony.config import load_config
+from symphony.models import InstrumentName
 
 
 def pytest_collection_modifyitems(items: list[pytest.Item]) -> None:
@@ -35,7 +35,7 @@ def make_wrapper(tmp_path: Path, provider: str) -> str:
 
 
 def make_config(tmp_path: Path) -> Path:
-    providers = {provider.value: make_wrapper(tmp_path, provider.value) for provider in ProviderName}
+    providers = {provider.value: make_wrapper(tmp_path, provider.value) for provider in InstrumentName}
     escaped_providers = {
         key: value.replace("\\", "\\\\")
         for key, value in providers.items()
@@ -94,7 +94,7 @@ default_options = {{ extra_args = [] }}
 @pytest.fixture()
 def config_path(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     path = make_config(tmp_path)
-    monkeypatch.setenv("HIVE_API_CONFIG", str(path))
+    monkeypatch.setenv("SYMPHONY_CONFIG", str(path))
     return path
 
 

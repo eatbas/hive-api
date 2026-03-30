@@ -2,7 +2,7 @@
 
 from fastapi.testclient import TestClient
 
-from hive_api.service import create_app, _parse_generate_response
+from symphony.service import create_app, _parse_generate_response
 
 
 # ------------------------------------------------------------------

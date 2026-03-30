@@ -1,6 +1,6 @@
-from hive_api.models import ChatMode
-from hive_api.providers.base import ParseState
-from hive_api.providers.claude import ClaudeAdapter
+from symphony.models import ChatMode
+from symphony.providers.base import ParseState
+from symphony.providers.claude import ClaudeAdapter
 
 
 def test_claude_new_command_assigns_session_id():

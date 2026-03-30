@@ -3,9 +3,9 @@ requires = ["setuptools>=82", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "hive-api"
+name = "symphony"
 version = "0.1.0"
-description = "Hive — coordinated AI CLI collective (Gemini, Codex, Claude, Kimi, Copilot, OpenCode)"
+description = "Symphony — coordinated AI CLI collective (Gemini, Codex, Claude, Kimi, Copilot, OpenCode)"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
@@ -31,7 +31,7 @@ include-package-data = true
 where = ["src"]
 
 [tool.setuptools.package-data]
-hive_api = ["ui/*.html", "ui/static/*.css", "ui/static/*.js"]
+symphony = ["ui/*.html", "ui/static/*.css", "ui/static/*.js"]
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"

@@ -1,6 +1,6 @@
-from hive_api.models import ChatMode
-from hive_api.providers.base import ParseState
-from hive_api.providers.kimi import KimiAdapter
+from symphony.models import ChatMode
+from symphony.providers.base import ParseState
+from symphony.providers.kimi import KimiAdapter
 
 
 def test_kimi_new_command_assigns_session():
