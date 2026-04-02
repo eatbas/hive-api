@@ -11,6 +11,7 @@ class KimiAdapter(ProviderAdapter):
     name = InstrumentName.KIMI
     default_executable = "kimi"
     session_reference_format = "opaque-string"
+    _QUIET_ARGS = ["--quiet"]
 
     def new_session_ref(self) -> str | None:
         return self._uuid()
@@ -23,11 +24,9 @@ class KimiAdapter(ProviderAdapter):
             "--thinking",
             "--session",
             session_ref,
-            "--print",
+            *self._QUIET_ARGS,
             "--prompt",
             prompt,
-            "--output-format",
-            "stream-json",
         ]
         self._apply_model_override(argv, model)
         argv.extend(self._extra_args(provider_options))
@@ -40,11 +39,9 @@ class KimiAdapter(ProviderAdapter):
             "--thinking",
             "--session",
             session_ref,
-            "--print",
+            *self._QUIET_ARGS,
             "--prompt",
             prompt,
-            "--output-format",
-            "stream-json",
         ]
         self._apply_model_override(argv, model)
         argv.extend(self._extra_args(provider_options))

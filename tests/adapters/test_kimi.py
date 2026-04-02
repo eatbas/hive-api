@@ -14,8 +14,9 @@ def test_kimi_new_command_assigns_session():
         provider_options={},
     )
     assert "--session" in command.argv
-    assert "--print" in command.argv
-    assert "--output-format" in command.argv
+    assert "--quiet" in command.argv
+    assert "--print" not in command.argv
+    assert "--output-format" not in command.argv
     assert command.preset_session_ref
 
 
@@ -44,6 +45,7 @@ def test_kimi_resume_command_uses_session_flag():
         provider_options={},
     )
     assert "--session" in command.argv
+    assert "--quiet" in command.argv
     assert "kimi-sess-1" in command.argv
 
 
