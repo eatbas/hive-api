@@ -18,11 +18,11 @@ class TestPageLoad:
 
     def test_musician_count(self, console_page: Page):
         count = console_page.locator("#musician-count")
-        expect(count).to_have_text("9")
+        expect(count).to_have_text("11")
 
     def test_all_musicians_shown(self, console_page: Page):
         chips = console_page.locator(".musician-chip")
-        expect(chips).to_have_count(9)
+        expect(chips).to_have_count(11)
 
     def test_all_musicians_ready(self, console_page: Page):
         chips = console_page.locator(".musician-chip")
@@ -44,20 +44,20 @@ class TestProviderModelDropdowns:
         console_page.wait_for_timeout(200)
         model_options = console_page.locator("#model option")
         models = [model_options.nth(i).get_attribute("value") for i in range(model_options.count())]
-        assert "sonnet" in models
         assert "opus" in models
+        assert "haiku" in models
 
     def test_codex_models(self, console_page: Page):
         console_page.select_option("#provider", "codex")
         console_page.wait_for_timeout(200)
         model_options = console_page.locator("#model option")
         models = [model_options.nth(i).get_attribute("value") for i in range(model_options.count())]
-        assert "gpt-5.3-codex" in models
-        assert "gpt-5.4-mini" in models
+        assert "gpt-5.4" in models
+        assert "gpt-5.4" in models
 
     def test_kimi_models(self, console_page: Page):
         console_page.select_option("#provider", "kimi")
         console_page.wait_for_timeout(200)
         model_options = console_page.locator("#model option")
         models = [model_options.nth(i).get_attribute("value") for i in range(model_options.count())]
-        assert "default" in models
+        assert "kimi-code/kimi-for-coding" in models

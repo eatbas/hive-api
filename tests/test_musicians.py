@@ -26,7 +26,7 @@ async def test_orchestra_boots_all_musicians(loaded_config):
     await manager.start()
     try:
         musicians = manager.musician_info()
-        assert len(musicians) == 9
+        assert len(musicians) == 11
         assert all(musician.ready for musician in musicians)
     finally:
         await manager.stop()
@@ -37,12 +37,12 @@ async def test_musician_ready_busy_idle_lifecycle(loaded_config):
     manager = Orchestra(loaded_config)
     await manager.start()
     try:
-        musician = manager.get_musician(InstrumentName.CLAUDE, "sonnet")
+        musician = manager.get_musician(InstrumentName.CLAUDE, "opus")
         assert musician is not None
         assert musician.ready
         assert not musician.busy
 
-        handle = await musician.submit(_new_request(InstrumentName.CLAUDE, "sonnet"))
+        handle = await musician.submit(_new_request(InstrumentName.CLAUDE, "opus"))
         result = await handle.result_future
         assert result.exit_code == 0
         assert not musician.busy
@@ -56,17 +56,17 @@ async def test_resume_rejects_model_change_in_same_runtime(loaded_config):
     manager = Orchestra(loaded_config)
     await manager.start()
     try:
-        musician = manager.get_musician(InstrumentName.CLAUDE, "sonnet")
+        musician = manager.get_musician(InstrumentName.CLAUDE, "opus")
         assert musician is not None
-        handle = await musician.submit(_new_request(InstrumentName.CLAUDE, "sonnet"))
+        handle = await musician.submit(_new_request(InstrumentName.CLAUDE, "opus"))
         result = await handle.result_future
         assert result.provider_session_ref is not None
 
-        alt_musician = manager.get_musician(InstrumentName.CLAUDE, "opus")
+        alt_musician = manager.get_musician(InstrumentName.CLAUDE, "haiku")
         assert alt_musician is not None
         resume_request = ChatRequest(
             provider=InstrumentName.CLAUDE,
-            model="opus",
+            model="haiku",
             workspace_path=str(Path.cwd().resolve()),
             mode=ChatMode.RESUME,
             prompt="again",
@@ -86,11 +86,11 @@ async def test_concurrent_requests_serialize_on_same_musician(loaded_config):
     manager = Orchestra(loaded_config)
     await manager.start()
     try:
-        musician = manager.get_musician(InstrumentName.CLAUDE, "sonnet")
+        musician = manager.get_musician(InstrumentName.CLAUDE, "opus")
         assert musician is not None
 
-        h1 = await musician.submit(_new_request(InstrumentName.CLAUDE, "sonnet", prompt="first"))
-        h2 = await musician.submit(_new_request(InstrumentName.CLAUDE, "sonnet", prompt="second"))
+        h1 = await musician.submit(_new_request(InstrumentName.CLAUDE, "opus", prompt="first"))
+        h2 = await musician.submit(_new_request(InstrumentName.CLAUDE, "opus", prompt="second"))
 
         r1, r2 = await asyncio.gather(h1.result_future, h2.result_future)
         assert "first" in r1.final_text
@@ -114,9 +114,9 @@ async def test_failed_prompt_sets_musician_error(loaded_config):
     manager = Orchestra(loaded_config)
     await manager.start()
     try:
-        musician = manager.get_musician(InstrumentName.CLAUDE, "sonnet")
+        musician = manager.get_musician(InstrumentName.CLAUDE, "opus")
         assert musician is not None
-        handle = await musician.submit(_new_request(InstrumentName.CLAUDE, "sonnet", prompt="fail"))
+        handle = await musician.submit(_new_request(InstrumentName.CLAUDE, "opus", prompt="fail"))
         with pytest.raises(Exception):
             await handle.result_future
         assert musician.last_error is not None
@@ -130,16 +130,16 @@ async def test_musician_recovers_after_failure(loaded_config):
     manager = Orchestra(loaded_config)
     await manager.start()
     try:
-        musician = manager.get_musician(InstrumentName.CODEX, "gpt-5.3-codex")
+        musician = manager.get_musician(InstrumentName.CODEX, "gpt-5.4")
         assert musician is not None
 
         # First request fails
-        h1 = await musician.submit(_new_request(InstrumentName.CODEX, "gpt-5.3-codex", prompt="fail"))
+        h1 = await musician.submit(_new_request(InstrumentName.CODEX, "gpt-5.4", prompt="fail"))
         with pytest.raises(Exception):
             await h1.result_future
 
         # Second request should succeed (musician recovers)
-        h2 = await musician.submit(_new_request(InstrumentName.CODEX, "gpt-5.3-codex", prompt="recover"))
+        h2 = await musician.submit(_new_request(InstrumentName.CODEX, "gpt-5.4", prompt="recover"))
         r2 = await h2.result_future
         assert "recover" in r2.final_text
     finally:
@@ -151,8 +151,8 @@ async def test_health_details_reports_musician_errors(loaded_config):
     manager = Orchestra(loaded_config)
     await manager.start()
     try:
-        musician = manager.get_musician(InstrumentName.CLAUDE, "sonnet")
-        handle = await musician.submit(_new_request(InstrumentName.CLAUDE, "sonnet", prompt="fail"))
+        musician = manager.get_musician(InstrumentName.CLAUDE, "opus")
+        handle = await musician.submit(_new_request(InstrumentName.CLAUDE, "opus", prompt="fail"))
         with pytest.raises(Exception):
             await handle.result_future
 
@@ -189,7 +189,7 @@ async def test_unavailable_provider_skips_musician_creation(loaded_config):
         manager = Orchestra(loaded_config)
         await manager.start()
         try:
-            assert manager.get_musician(InstrumentName.CLAUDE, "sonnet") is None
+            assert manager.get_musician(InstrumentName.CLAUDE, "opus") is None
             assert manager.get_musician(InstrumentName.CLAUDE, "opus") is None
             assert manager.available_providers[InstrumentName.CLAUDE] is False
 
@@ -228,12 +228,12 @@ async def test_cancel_queued_score(loaded_config):
     manager = Orchestra(loaded_config)
     await manager.start()
     try:
-        musician = manager.get_musician(InstrumentName.CLAUDE, "sonnet")
+        musician = manager.get_musician(InstrumentName.CLAUDE, "opus")
         assert musician is not None
 
         # Submit two scores -- second one will be queued while first runs
-        h1 = await musician.submit(_new_request(InstrumentName.CLAUDE, "sonnet", prompt="first"))
-        h2 = await musician.submit(_new_request(InstrumentName.CLAUDE, "sonnet", prompt="second"))
+        h1 = await musician.submit(_new_request(InstrumentName.CLAUDE, "opus", prompt="first"))
+        h2 = await musician.submit(_new_request(InstrumentName.CLAUDE, "opus", prompt="second"))
         manager.register_score(h1)
         manager.register_score(h2)
 
@@ -261,10 +261,10 @@ async def test_cancel_running_score_terminates_cli_promptly_and_recovers(loaded_
     manager = Orchestra(loaded_config)
     await manager.start()
     try:
-        musician = manager.get_musician(InstrumentName.CODEX, "gpt-5.3-codex")
+        musician = manager.get_musician(InstrumentName.CODEX, "gpt-5.4")
         assert musician is not None
 
-        handle = await musician.submit(_new_request(InstrumentName.CODEX, "gpt-5.3-codex", prompt="slow"))
+        handle = await musician.submit(_new_request(InstrumentName.CODEX, "gpt-5.4", prompt="slow"))
         manager.register_score(handle)
 
         for _ in range(20):
@@ -281,7 +281,7 @@ async def test_cancel_running_score_terminates_cli_promptly_and_recovers(loaded_
         with pytest.raises(ScoreCancelledError):
             await asyncio.wait_for(handle.result_future, timeout=2.0)
 
-        follow_up = await musician.submit(_new_request(InstrumentName.CODEX, "gpt-5.3-codex", prompt="recover"))
+        follow_up = await musician.submit(_new_request(InstrumentName.CODEX, "gpt-5.4", prompt="recover"))
         response = await asyncio.wait_for(follow_up.result_future, timeout=2.0)
         assert "recover" in response.final_text
     finally:
@@ -296,10 +296,10 @@ async def test_score_status_transitions(loaded_config):
     manager = Orchestra(loaded_config)
     await manager.start()
     try:
-        musician = manager.get_musician(InstrumentName.CLAUDE, "sonnet")
+        musician = manager.get_musician(InstrumentName.CLAUDE, "opus")
         assert musician is not None
 
-        handle = await musician.submit(_new_request(InstrumentName.CLAUDE, "sonnet"))
+        handle = await musician.submit(_new_request(InstrumentName.CLAUDE, "opus"))
         manager.register_score(handle)
         assert handle.status == ScoreStatus.QUEUED
 

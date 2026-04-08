@@ -56,7 +56,7 @@ class TestFailedRequest:
 
     def test_recovery_after_failure(self, console_page: Page, tmp_path):
         console_page.select_option("#provider", "codex")
-        console_page.select_option("#model", "gpt-5.3-codex")
+        console_page.select_option("#model", "gpt-5.4")
         console_page.fill("#workspace_path", str(tmp_path.resolve()))
         console_page.fill("#prompt", "fail")
         console_page.click("#send-button")
@@ -72,7 +72,7 @@ class TestFailedRequest:
         )
 
         console_page.select_option("#provider", "codex")
-        console_page.select_option("#model", "gpt-5.3-codex")
+        console_page.select_option("#model", "gpt-5.4")
         console_page.fill("#workspace_path", str(tmp_path.resolve()))
         console_page.fill("#prompt", "recover")
         console_page.click("#send-button")

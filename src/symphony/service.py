@@ -10,6 +10,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
 from .config import load_config
+from .discovery import run_startup_discovery
 from .models import HealthResponse
 from .routes import (
     _parse_generate_response,
@@ -61,6 +62,12 @@ OPENAPI_TAGS = [
 
 def create_app() -> FastAPI:
     config = load_config()
+
+    # Discover models from installed CLIs and update config.toml before
+    # the Orchestra reads it.  If any provider's model list changed the
+    # config is reloaded so the Orchestra boots with fresh data.
+    if run_startup_discovery(config.config_path):
+        config = load_config(config.config_path)
 
     try:
         orchestra = Orchestra(config)

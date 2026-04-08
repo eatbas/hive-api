@@ -53,37 +53,37 @@ path = ""
 [providers.gemini]
 enabled = true
 executable = "{escaped_providers['gemini']}"
-models = ["gemini-3-flash-preview"]
+models = ["gemini-3-flash-preview", "gemini-3.1-pro-preview"]
 default_options = {{ extra_args = [] }}
 
 [providers.codex]
 enabled = true
 executable = "{escaped_providers['codex']}"
-models = ["gpt-5.3-codex", "gpt-5.4-mini"]
+models = ["gpt-5.4", "gpt-5.2"]
 default_options = {{ extra_args = [] }}
 
 [providers.claude]
 enabled = true
 executable = "{escaped_providers['claude']}"
-models = ["sonnet", "opus"]
+models = ["opus", "haiku"]
 default_options = {{ extra_args = [] }}
 
 [providers.kimi]
 enabled = true
 executable = "{escaped_providers['kimi']}"
-models = ["default"]
+models = ["kimi-code/kimi-for-coding"]
 default_options = {{ extra_args = [] }}
 
 [providers.copilot]
 enabled = true
 executable = "{escaped_providers['copilot']}"
-models = ["claude-sonnet-4.6"]
+models = ["claude-sonnet-4.6", "grok-code-fast-1"]
 default_options = {{ extra_args = [] }}
 
 [providers.opencode]
 enabled = true
 executable = "{escaped_providers['opencode']}"
-models = ["glm-4.7-flash", "glm-5.1"]
+models = ["glm-4.5", "glm-5.1"]
 default_options = {{ extra_args = [] }}
 """.strip(),
         encoding="utf-8",
@@ -95,6 +95,7 @@ default_options = {{ extra_args = [] }}
 def config_path(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     path = make_config(tmp_path)
     monkeypatch.setenv("SYMPHONY_CONFIG", str(path))
+    monkeypatch.setenv("SYMPHONY_SKIP_DISCOVERY", "1")
     return path
 
 

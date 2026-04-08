@@ -65,7 +65,7 @@ def test_verify_new_fail(config_path, tmp_path):
             "items": [
                 {
                     "provider": "codex",
-                    "model": "gpt-5.3-codex",
+                    "model": "gpt-5.4",
                     "new_exit_code": 1,
                     "resume_text": "PF ATM Transit",
                     "resume_exit_code": 0,
@@ -175,7 +175,7 @@ def test_verify_multiple_models(config_path, tmp_path):
                 },
                 {
                     "provider": "codex",
-                    "model": "gpt-5.3-codex",
+                    "model": "gpt-5.4",
                     "new_exit_code": 0,
                     "resume_text": "PF only",
                     "resume_exit_code": 0,

@@ -9,7 +9,7 @@ path = ""
 [providers.gemini]
 enabled = true
 executable = ""
-models = ["gemini-3-flash-preview"]
+models = ["gemini-3-flash-preview", "gemini-2.5-pro", "gemini-3.1-pro-preview"]
 default_options = { extra_args = [] }
 # Desktop app manages timeouts via agent_timeout_ms; 0 = no sidecar timeout.
 cli_timeout = 0
@@ -23,8 +23,7 @@ models = [
   "gpt-5.4",
   "gpt-5.4-mini",
   "gpt-5.3-codex",
-  "gpt-5.2-codex",
-  "gpt-5.1-codex-mini",
+  "gpt-5.2",
 ]
 default_options = { extra_args = [] }
 cli_timeout = 0
@@ -56,6 +55,13 @@ models = [
   "gpt-5.4",
   "gpt-5.3-codex",
   "gpt-5.4-mini",
+  "gpt-5.2",
+  "gpt-5-mini",
+  "gpt-4.1",
+  "gemini-3-pro",
+  "gemini-3-flash",
+  "gemini-2.5-pro",
+  "grok-code-fast-1",
 ]
 default_options = { extra_args = [] }
 cli_timeout = 0
@@ -64,7 +70,20 @@ idle_timeout = 0
 [providers.opencode]
 enabled = true
 executable = ""
-models = ["glm-5", "glm-5.1", "glm-5-turbo", "glm-4.7"]
+models = [
+  "glm-4.5",
+  "glm-4.5-air",
+  "glm-4.5-flash",
+  "glm-4.5v",
+  "glm-4.6",
+  "glm-4.6v",
+  "glm-4.7",
+  "glm-4.7-flash",
+  "glm-4.7-flashx",
+  "glm-5",
+  "glm-5-turbo",
+  "glm-5.1",
+]
 default_options = { extra_args = [] }
 cli_timeout = 0
 idle_timeout = 0

@@ -36,7 +36,7 @@ def test_health_and_provider_endpoints(config_path):
         health = client.get("/health")
         assert health.status_code == 200
         payload = health.json()
-        assert payload["musician_count"] == 9
+        assert payload["musician_count"] == 11
 
         providers = client.get("/v1/providers")
         assert providers.status_code == 200
@@ -48,7 +48,7 @@ def test_health_and_provider_endpoints(config_path):
 
         musicians = client.get("/v1/musicians")
         assert musicians.status_code == 200
-        assert len(musicians.json()) == 9
+        assert len(musicians.json()) == 11
 
 
 def test_chat_json_and_streaming(config_path, tmp_path):
@@ -56,7 +56,7 @@ def test_chat_json_and_streaming(config_path, tmp_path):
     with TestClient(app) as client:
         body = {
             "provider": "claude",
-            "model": "sonnet",
+            "model": "opus",
             "workspace_path": str(tmp_path.resolve()),
             "mode": "new",
             "prompt": "hello",
@@ -68,7 +68,7 @@ def test_chat_json_and_streaming(config_path, tmp_path):
 
         ws_body = {
             "provider": "codex",
-            "model": "gpt-5.3-codex",
+            "model": "gpt-5.4",
             "workspace_path": str(tmp_path.resolve()),
             "mode": "new",
             "prompt": "hello",
@@ -106,7 +106,7 @@ def test_chat_opencode_json(config_path, tmp_path):
     with TestClient(app) as client:
         body = {
             "provider": "opencode",
-            "model": "glm-4.7-flash",
+            "model": "glm-4.5",
             "workspace_path": str(tmp_path.resolve()),
             "mode": "new",
             "prompt": "hello",
@@ -141,7 +141,7 @@ def test_chat_returns_400_for_unavailable_provider(config_path, tmp_path):
         orchestra.available_providers[InstrumentName.CLAUDE] = False
         body = {
             "provider": "claude",
-            "model": "sonnet",
+            "model": "opus",
             "workspace_path": str(tmp_path.resolve()),
             "mode": "new",
             "prompt": "hello",
@@ -170,7 +170,7 @@ def test_chat_resume_requires_session_ref(config_path, tmp_path):
     with TestClient(app) as client:
         body = {
             "provider": "claude",
-            "model": "sonnet",
+            "model": "opus",
             "workspace_path": str(tmp_path.resolve()),
             "mode": "resume",
             "prompt": "hello",
@@ -184,7 +184,7 @@ def test_chat_rejects_relative_workspace_path(config_path):
     with TestClient(app) as client:
         body = {
             "provider": "claude",
-            "model": "sonnet",
+            "model": "opus",
             "workspace_path": "relative/path",
             "mode": "new",
             "prompt": "hello",
@@ -226,7 +226,7 @@ def test_models_endpoint_returns_all_models(config_path):
     app = create_app()
     with TestClient(app) as client:
         models = client.get("/v1/models").json()
-        assert len(models) == 9  # 1 gemini + 2 codex + 2 claude + 1 kimi + 1 copilot + 2 opencode
+        assert len(models) == 11  # 2 gemini + 2 codex + 2 claude + 1 kimi + 2 copilot + 2 opencode
         providers_seen = {m["provider"] for m in models}
         assert "claude" in providers_seen
         assert "copilot" in providers_seen
@@ -263,7 +263,7 @@ def test_no_persistent_state_files_created(config_path, tmp_path):
     with TestClient(app) as client:
         body = {
             "provider": "kimi",
-            "model": "default",
+            "model": "kimi-code/kimi-for-coding",
             "workspace_path": str(tmp_path.resolve()),
             "mode": "new",
             "prompt": "hello",
@@ -287,7 +287,7 @@ def test_stop_completed_score_is_idempotent(config_path, tmp_path):
     with TestClient(app) as client:
         body = {
             "provider": "claude",
-            "model": "sonnet",
+            "model": "opus",
             "workspace_path": str(tmp_path.resolve()),
             "mode": "new",
             "prompt": "hello",
@@ -308,7 +308,7 @@ def test_chat_response_includes_score_id(config_path, tmp_path):
     with TestClient(app) as client:
         body = {
             "provider": "codex",
-            "model": "gpt-5.3-codex",
+            "model": "gpt-5.4",
             "workspace_path": str(tmp_path.resolve()),
             "mode": "new",
             "prompt": "hello",
@@ -325,7 +325,7 @@ def test_websocket_snapshot_includes_score_id(config_path, tmp_path):
     with TestClient(app) as client:
         body = {
             "provider": "claude",
-            "model": "sonnet",
+            "model": "opus",
             "workspace_path": str(tmp_path.resolve()),
             "mode": "new",
             "prompt": "hello",
