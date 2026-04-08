@@ -117,7 +117,10 @@ async def get_latest_version(*, manager: Orchestra, runner: RunCmd, pkg_info: CL
 
 
 async def get_latest_version_via_shell(*, musician: Musician, pkg_info: CLIPackageInfo) -> str | None:
-    if pkg_info.manager == "npm":
+    # Native CLIs still have npm packages — check the registry to
+    # compare versions even though the actual update uses the CLI's
+    # own command.
+    if pkg_info.manager in ("npm", "native"):
         code, output = await musician.run_quick_command(f"npm view {pkg_info.package} version 2>&1\n__symphony_exit=$?")
         if code == 0 and output:
             return _parse_version(output)
@@ -137,7 +140,7 @@ async def get_latest_version_via_shell(*, musician: Musician, pkg_info: CLIPacka
 
 
 async def get_latest_version_subprocess(*, runner: RunCmd, pkg_info: CLIPackageInfo) -> str | None:
-    if pkg_info.manager == "npm":
+    if pkg_info.manager in ("npm", "native"):
         code, output = await runner("npm", "view", pkg_info.package, "version")
         if code != 0:
             logger.warning("npm view failed for %s (exit %d)", pkg_info.package, code)

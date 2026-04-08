@@ -13,17 +13,18 @@ _VERSION_RE = re.compile(r"(\d+\.\d+\.\d+)")
 @dataclass(slots=True)
 class CLIPackageInfo:
     provider: InstrumentName
-    manager: str
-    package: str
+    manager: str          # "npm", "uv", or "native"
+    package: str          # npm/PyPI package name
+    update_cmd: str = ""  # Native CLI update command (e.g. "claude update")
 
 
 PACKAGE_REGISTRY: dict[str, CLIPackageInfo] = {
-    "claude": CLIPackageInfo(InstrumentName.CLAUDE, "npm", "@anthropic-ai/claude-code"),
+    "claude": CLIPackageInfo(InstrumentName.CLAUDE, "native", "@anthropic-ai/claude-code", "claude update"),
     "codex": CLIPackageInfo(InstrumentName.CODEX, "npm", "@openai/codex"),
     "gemini": CLIPackageInfo(InstrumentName.GEMINI, "npm", "@google/gemini-cli"),
     "kimi": CLIPackageInfo(InstrumentName.KIMI, "uv", "kimi-cli"),
-    "copilot": CLIPackageInfo(InstrumentName.COPILOT, "npm", "@github/copilot"),
-    "opencode": CLIPackageInfo(InstrumentName.OPENCODE, "npm", "opencode-ai"),
+    "copilot": CLIPackageInfo(InstrumentName.COPILOT, "native", "@github/copilot", "copilot update"),
+    "opencode": CLIPackageInfo(InstrumentName.OPENCODE, "native", "opencode-ai", "opencode upgrade"),
 }
 
 

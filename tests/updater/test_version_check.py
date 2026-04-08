@@ -56,25 +56,29 @@ class TestPackageRegistry:
         assert "copilot" in PACKAGE_REGISTRY
         assert "opencode" in PACKAGE_REGISTRY
 
-    def test_copilot_is_npm(self):
+    def test_copilot_is_native(self):
         info = PACKAGE_REGISTRY["copilot"]
-        assert info.manager == "npm"
+        assert info.manager == "native"
         assert info.package == "@github/copilot"
+        assert info.update_cmd == "copilot update"
 
-    def test_claude_is_npm(self):
+    def test_claude_is_native(self):
         info = PACKAGE_REGISTRY["claude"]
-        assert info.manager == "npm"
+        assert info.manager == "native"
         assert info.package == "@anthropic-ai/claude-code"
+        assert info.update_cmd == "claude update"
 
     def test_kimi_is_uv(self):
         info = PACKAGE_REGISTRY["kimi"]
         assert info.manager == "uv"
         assert info.package == "kimi-cli"
+        assert info.update_cmd == ""
 
-    def test_opencode_is_npm(self):
+    def test_opencode_is_native(self):
         info = PACKAGE_REGISTRY["opencode"]
-        assert info.manager == "npm"
+        assert info.manager == "native"
         assert info.package == "opencode-ai"
+        assert info.update_cmd == "opencode upgrade"
         assert info.provider == InstrumentName.OPENCODE
 
 

@@ -4,9 +4,9 @@
 This script wraps the ``symphony.discovery`` module for manual use.
 The same discovery runs automatically on every Symphony startup.
 
-For providers whose CLI supports model listing (currently OpenCode),
-models are discovered dynamically.  All other providers keep whatever
-is already in ``config.toml`` — edit that file directly to change them.
+All six providers (Claude, Gemini, Codex, Copilot, Kimi, OpenCode)
+have programmatic discovery — via CLI subcommands, local caches,
+or provider API calls using locally-stored credentials.
 
 Usage:
     python scripts/discover_models.py              # dry-run, print diff
@@ -25,11 +25,10 @@ _SRC = Path(__file__).resolve().parent.parent / "src"
 sys.path.insert(0, str(_SRC))
 
 from symphony.discovery.discoverer import (  # noqa: E402
-    _DISCOVERERS,
     _parse_models_from_toml,
-    _format_models_toml,
     _replace_models_in_toml,
 )
+from symphony.discovery.providers import DISCOVERERS  # noqa: E402
 from symphony.models import InstrumentName  # noqa: E402
 
 PROVIDER_ORDER = ["gemini", "codex", "claude", "kimi", "copilot", "opencode"]
@@ -58,10 +57,10 @@ def main() -> None:
             continue
 
         current = _parse_models_from_toml(config_text, provider_name)
-        discover_fn = _DISCOVERERS.get(provider)
+        discover_fn = DISCOVERERS.get(provider)
 
         if discover_fn is None:
-            print(f"  {provider_name}: no CLI discovery available — keeping config ({len(current)} models)")
+            print(f"  {provider_name}: no discovery function registered — keeping config ({len(current)} models)")
             continue
 
         discovered = discover_fn()

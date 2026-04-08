@@ -51,18 +51,22 @@ class CLIUpdater:
         return all(not m.busy and m.queue.qsize() == 0 for m in musicians)
 
     async def update_cli(self, pkg_info: CLIPackageInfo, *, executable: str | None = None) -> bool:
-        # Detect whether the active binary was installed via npm/uv or a
-        # native standalone installer (e.g. ~/.local/share/claude/versions/).
-        method = pkg_info.manager
-        if executable:
-            detected = detect_install_method(executable)
-            if detected != "unknown":
-                method = detected
+        # CLIs with a native update command always use that — it works
+        # regardless of how the CLI was installed (npm, standalone, etc.).
+        # Only fall back to package-manager detection for CLIs without one.
+        if pkg_info.update_cmd:
+            method = "native"
+        else:
+            method = pkg_info.manager
+            if executable:
+                detected = detect_install_method(executable)
+                if detected != "unknown":
+                    method = detected
 
         logger.info("Updating %s (method=%s) ...", pkg_info.package, method)
 
         if method == "native":
-            cmd_str = f"{executable} update 2>&1\n__symphony_exit=$?"
+            cmd_str = f"{pkg_info.update_cmd} 2>&1\n__symphony_exit=$?"
         elif method == "npm":
             cmd_str = f"npm install -g {pkg_info.package}@latest 2>&1\n__symphony_exit=$?"
         elif method == "uv":
@@ -88,7 +92,9 @@ class CLIUpdater:
                 logger.debug("Shell update failed for %s, falling back to subprocess", pkg_info.package)
 
         if method == "native":
-            code, output = await self._run_cmd(executable or pkg_info.package, "update", timeout=120)
+            # Split the update_cmd into executable and args.
+            parts = pkg_info.update_cmd.split()
+            code, output = await self._run_cmd(*parts, timeout=120)
         elif method == "npm":
             code, output = await self._run_cmd("npm", "install", "-g", f"{pkg_info.package}@latest", timeout=120)
         elif method == "uv":
