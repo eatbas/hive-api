@@ -7,6 +7,8 @@ import shlex
 import subprocess
 from collections.abc import Awaitable, Callable
 
+import httpx
+
 from ..models import InstrumentName
 from ..orchestra import Musician, Orchestra
 from .registry import CLIPackageInfo, _parse_version
@@ -60,6 +62,22 @@ async def run_cmd(*args: str, timeout: int = _CMD_TIMEOUT) -> tuple[int, str]:
     return await asyncio.to_thread(_run_cmd_sync, *args, timeout=timeout)
 
 
+_PYPI_URL = "https://pypi.org/pypi/{}/json"
+
+
+async def _get_latest_pypi_version(package: str) -> str | None:
+    """Fetch the latest version of a package from PyPI."""
+    try:
+        async with httpx.AsyncClient(timeout=10) as client:
+            resp = await client.get(_PYPI_URL.format(package))
+            resp.raise_for_status()
+            data = resp.json()
+            return data.get("info", {}).get("version")
+    except Exception:
+        logger.debug("PyPI lookup failed for %s", package)
+        return None
+
+
 async def get_current_version(
     *,
     manager: Orchestra,
@@ -104,6 +122,12 @@ async def get_latest_version_via_shell(*, musician: Musician, pkg_info: CLIPacka
         if code == 0 and output:
             return _parse_version(output)
     elif pkg_info.manager == "uv":
+        # Query PyPI for the latest published version (uv tool list
+        # only reports the locally installed version, not the latest).
+        pypi_version = await _get_latest_pypi_version(pkg_info.package)
+        if pypi_version:
+            return pypi_version
+        # Fallback: parse local install list (will match current version).
         code, output = await musician.run_quick_command("uv tool list 2>&1\n__symphony_exit=$?")
         if code == 0 and output:
             for line in output.splitlines():
@@ -121,6 +145,11 @@ async def get_latest_version_subprocess(*, runner: RunCmd, pkg_info: CLIPackageI
         return _parse_version(output)
 
     if pkg_info.manager == "uv":
+        # Query PyPI for the latest published version.
+        pypi_version = await _get_latest_pypi_version(pkg_info.package)
+        if pypi_version:
+            return pypi_version
+        # Fallback: parse local install list.
         code, output = await runner("uv", "tool", "list")
         if code != 0:
             logger.warning("uv tool list failed (exit %d)", code)

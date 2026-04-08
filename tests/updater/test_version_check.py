@@ -113,17 +113,36 @@ class TestGetLatestVersion:
             mock_cmd.assert_called_once_with("npm", "view", "@anthropic-ai/claude-code", "version")
 
     @pytest.mark.asyncio()
-    async def test_uv_package(self, updater):
+    async def test_uv_package_via_pypi(self, updater):
         pkg = CLIPackageInfo(InstrumentName.KIMI, "uv", "kimi-cli")
-        with patch.object(updater, "_run_cmd", new_callable=AsyncMock) as mock_cmd:
+        with patch("symphony.updater.version_checker._get_latest_pypi_version", new_callable=AsyncMock) as mock_pypi:
+            mock_pypi.return_value = "1.25.0"
+            version = await updater.get_latest_version(pkg)
+            assert version == "1.25.0"
+            mock_pypi.assert_called_once_with("kimi-cli")
+
+    @pytest.mark.asyncio()
+    async def test_uv_package_pypi_fallback_to_uv_tool_list(self, updater):
+        """When PyPI is unreachable, falls back to uv tool list."""
+        pkg = CLIPackageInfo(InstrumentName.KIMI, "uv", "kimi-cli")
+        with (
+            patch("symphony.updater.version_checker._get_latest_pypi_version", new_callable=AsyncMock) as mock_pypi,
+            patch.object(updater, "_run_cmd", new_callable=AsyncMock) as mock_cmd,
+        ):
+            mock_pypi.return_value = None
             mock_cmd.return_value = (0, "kimi-cli v1.2.0\n- kimi\nother-tool v0.1.0\n")
             version = await updater.get_latest_version(pkg)
             assert version == "1.2.0"
 
     @pytest.mark.asyncio()
     async def test_uv_package_not_found(self, updater):
+        """When both PyPI and uv tool list fail to find the package."""
         pkg = CLIPackageInfo(InstrumentName.KIMI, "uv", "kimi-cli")
-        with patch.object(updater, "_run_cmd", new_callable=AsyncMock) as mock_cmd:
+        with (
+            patch("symphony.updater.version_checker._get_latest_pypi_version", new_callable=AsyncMock) as mock_pypi,
+            patch.object(updater, "_run_cmd", new_callable=AsyncMock) as mock_cmd,
+        ):
+            mock_pypi.return_value = None
             mock_cmd.return_value = (0, "other-tool v0.1.0\n")
             version = await updater.get_latest_version(pkg)
             assert version is None
