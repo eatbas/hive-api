@@ -80,6 +80,7 @@ async def update_single_provider_impl(updater: "CLIUpdater", provider: Instrumen
     if success:
         await updater.manager.restart_provider(provider)
         await updater.manager.activate_provider(provider)
+        await updater._rediscover_models(provider)
         last_updated = datetime.now(timezone.utc).isoformat()
         current = await updater.get_current_version(executable or adapter.default_executable, provider)
     else:

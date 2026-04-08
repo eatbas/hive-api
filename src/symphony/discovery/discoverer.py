@@ -125,3 +125,52 @@ def run_startup_discovery(config_path: Path) -> bool:
         logger.info("config.toml updated with discovered models")
 
     return changed
+
+
+def discover_provider(provider: InstrumentName, config_path: Path) -> bool:
+    """Discover models for a single provider and update ``config.toml``.
+
+    Intended to be called after a CLI update so that newly available
+    models are picked up without a full restart.
+
+    Returns ``True`` if config.toml was modified.
+    """
+    discover_fn = DISCOVERERS.get(provider)
+    if discover_fn is None:
+        return False
+
+    if not config_path.exists():
+        return False
+
+    try:
+        discovered = discover_fn()
+    except Exception:
+        logger.exception("Post-update discovery failed for %s", provider.value)
+        return False
+
+    if discovered is None:
+        logger.debug(
+            "No discovery result for %s after update — keeping config as-is",
+            provider.value,
+        )
+        return False
+
+    text = config_path.read_text(encoding="utf-8")
+    current = _parse_models_from_toml(text, provider.value)
+
+    if set(discovered) == set(current):
+        logger.debug("Models for %s unchanged after update", provider.value)
+        return False
+
+    added = set(discovered) - set(current)
+    removed = set(current) - set(discovered)
+    logger.info(
+        "Post-update model change for %s: +%s -%s",
+        provider.value,
+        sorted(added) if added else "none",
+        sorted(removed) if removed else "none",
+    )
+
+    updated_text = _replace_models_in_toml(text, provider.value, discovered)
+    config_path.write_text(updated_text, encoding="utf-8")
+    return True

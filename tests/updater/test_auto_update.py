@@ -213,6 +213,53 @@ class TestUpdateSingleProvider:
             await manager.stop()
 
 
+class TestRediscoveryIntegration:
+    @pytest.mark.asyncio()
+    async def test_rediscovery_called_after_successful_update(self, loaded_config):
+        manager = Orchestra(loaded_config)
+        await manager.start()
+        try:
+            checker = CLIUpdater(manager=manager, config=UpdaterConfig(enabled=True, interval_hours=4.0, auto_update=True))
+            call_counts: dict[str, int] = {}
+
+            async def version_side_effect(executable, provider=None):
+                key = str(provider or executable)
+                call_counts[key] = call_counts.get(key, 0) + 1
+                return "1.0.0" if call_counts[key] == 1 else "1.1.0"
+
+            with patch.object(checker, "get_current_version", side_effect=version_side_effect), patch.object(
+                checker, "get_latest_version", new_callable=AsyncMock
+            ) as mock_latest, patch.object(checker, "update_cli", new_callable=AsyncMock) as mock_update, patch.object(
+                manager, "restart_provider", new_callable=AsyncMock
+            ), patch.object(checker, "_rediscover_models", new_callable=AsyncMock) as mock_rediscover:
+                mock_latest.return_value = "1.1.0"
+                mock_update.return_value = True
+                await checker.check_and_update_all()
+                assert mock_rediscover.call_count == 6
+
+        finally:
+            await manager.stop()
+
+    @pytest.mark.asyncio()
+    async def test_rediscovery_not_called_after_failed_update(self, loaded_config):
+        manager = Orchestra(loaded_config)
+        await manager.start()
+        try:
+            checker = CLIUpdater(manager=manager, config=UpdaterConfig(enabled=True, interval_hours=4.0, auto_update=True))
+            with patch.object(checker, "get_current_version", new_callable=AsyncMock) as mock_curr, patch.object(
+                checker, "get_latest_version", new_callable=AsyncMock
+            ) as mock_latest, patch.object(checker, "update_cli", new_callable=AsyncMock) as mock_update, patch.object(
+                checker, "_rediscover_models", new_callable=AsyncMock
+            ) as mock_rediscover:
+                mock_curr.return_value = "1.0.0"
+                mock_latest.return_value = "1.1.0"
+                mock_update.return_value = False
+                await checker.check_and_update_all()
+                mock_rediscover.assert_not_called()
+        finally:
+            await manager.stop()
+
+
 class TestLifecycleAndCache:
     @pytest.mark.asyncio()
     async def test_start_stop(self, updater):

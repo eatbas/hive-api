@@ -5,8 +5,9 @@ import logging
 from datetime import datetime, timedelta, timezone
 
 from ..config import UpdaterConfig
+from ..discovery import discover_provider
 from ..models import CLIVersionStatus, InstrumentName
-from ..orchestra import Orchestra
+from ..orchestra import Orchestra, refresh_provider_models
 from .registry import CLIPackageInfo, PACKAGE_REGISTRY, detect_install_method, needs_update as _needs_update
 from .single_provider import update_single_provider_impl
 from .version_checker import (
@@ -27,6 +28,7 @@ class CLIUpdater:
         self.config = config
         self._last_results: list[CLIVersionStatus] = []
         self._task: asyncio.Task[None] | None = None
+        self._discovery_lock = asyncio.Lock()
         # Ensure the subprocess fallback also uses Git Bash.
         set_bash_path(manager.shell_path)
 
@@ -109,6 +111,20 @@ class CLIUpdater:
         logger.info("Successfully updated %s", pkg_info.package)
         return True
 
+    async def _rediscover_models(self, provider: InstrumentName) -> None:
+        """Run model discovery for *provider* after a successful CLI update.
+
+        Serialised via ``_discovery_lock`` to prevent concurrent
+        config.toml writes when multiple providers update in parallel.
+        """
+        async with self._discovery_lock:
+            config_path = self.manager.config.config_path
+            changed = await asyncio.to_thread(discover_provider, provider, config_path)
+        if changed:
+            refreshed = await refresh_provider_models(self.manager, provider)
+            if refreshed:
+                logger.info("Models refreshed for %s after CLI update", provider.value)
+
     def _next_check_at(self) -> str:
         return (datetime.now(timezone.utc) + timedelta(hours=self.config.interval_hours)).isoformat()
 
@@ -167,6 +183,7 @@ class CLIUpdater:
                 if success:
                     await self.manager.restart_provider(provider)
                     await self.manager.activate_provider(provider)
+                    await self._rediscover_models(provider)
                     last_updated = datetime.now(timezone.utc).isoformat()
                     current = await self.get_current_version(executable or adapter.default_executable, provider)
                     update_needed = _needs_update(current, latest)
