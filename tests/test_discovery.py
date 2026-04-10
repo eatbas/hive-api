@@ -65,8 +65,6 @@ class TestDiscoverProvider:
 
         with patch("symphony.discovery.providers._npm_package_dir", return_value=tmp_path):
             assert _discover_gemini() == [
-                "gemini-2.5-flash",
-                "gemini-2.5-pro",
                 "gemini-3-pro-preview",
                 "gemini-3.1-pro-preview",
             ]

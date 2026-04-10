@@ -21,7 +21,7 @@ from pathlib import Path
 
 from ..models import InstrumentName
 from ..shells import windows_subprocess_kwargs
-from .filters import filter_codex, filter_copilot, filter_opencode
+from .filters import filter_codex, filter_copilot, filter_gemini, filter_opencode
 
 logger = logging.getLogger("symphony.discovery")
 
@@ -153,12 +153,12 @@ def _discover_gemini() -> list[str] | None:
                     models.add(token_match.group(1))
             models = {name for name in models if _GEMINI_MODEL_RE.match(name)}
             if models:
-                return sorted(models)
+                return filter_gemini(sorted(models))
         for name in re.findall(r'"(gemini-\d[a-z0-9._-]*)"', text):
             if _GEMINI_MODEL_RE.match(name):
                 raw_models.add(name)
 
-    return sorted(raw_models) if raw_models else None
+    return filter_gemini(sorted(raw_models)) if raw_models else None
 
 
 # ---------------------------------------------------------------------------
