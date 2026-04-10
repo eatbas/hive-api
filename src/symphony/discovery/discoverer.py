@@ -15,6 +15,7 @@ import logging
 import os
 import re
 import tomllib
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 from typing import Iterable
 
@@ -175,14 +176,24 @@ def run_startup_discovery(config_path: Path) -> bool:
     updated_text = text
     changed = False
 
-    for provider, discover_fn in DISCOVERERS.items():
-        provider_name = provider.value
-        try:
-            discovered = discover_fn()
-        except Exception:
-            logger.exception("Discovery failed for %s", provider_name)
-            continue
+    # Run all provider discoveries in parallel — especially important
+    # because OpenCode spawns a subprocess with a 15 s timeout.
+    discovery_results: dict[InstrumentName, list[str] | None] = {}
+    with ThreadPoolExecutor(max_workers=len(DISCOVERERS)) as executor:
+        futures = {
+            executor.submit(discover_fn): provider
+            for provider, discover_fn in DISCOVERERS.items()
+        }
+        for future in as_completed(futures):
+            provider = futures[future]
+            try:
+                discovery_results[provider] = future.result()
+            except Exception:
+                logger.exception("Discovery failed for %s", provider.value)
+                discovery_results[provider] = None
 
+    for provider, discovered in discovery_results.items():
+        provider_name = provider.value
         if discovered is None:
             logger.debug(
                 "No discovery result for %s — keeping config as-is",

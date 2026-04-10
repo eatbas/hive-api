@@ -63,12 +63,10 @@ OPENAPI_TAGS = [
 def create_app() -> FastAPI:
     config = load_config()
 
-    # Discover models from installed CLIs and update config.toml before
-    # the Orchestra reads it.  If any provider's model list changed the
-    # config is reloaded so the Orchestra boots with fresh data.
-    if run_startup_discovery(config.config_path):
-        config = load_config(config.config_path)
-
+    # Discovery is deferred to _boot_orchestra() so the /health endpoint
+    # responds immediately.  The orchestra boots with the existing
+    # config.toml models (correct in 99% of launches) and refreshes
+    # after background discovery completes.
     try:
         orchestra = Orchestra(config)
     except GitBashNotFoundError:
@@ -82,14 +80,16 @@ def create_app() -> FastAPI:
     orchestra.restore_scores()
 
     async def _boot_orchestra() -> None:
-        """Boot musicians in the background, then start the updater.
+        """Boot musicians, run deferred discovery, then start the updater.
 
         This keeps the lifespan yield instant so uvicorn starts accepting
         connections immediately — the sidecar health check passes in <1s
         instead of waiting 8-12s for all bash sessions to spawn.
 
-        The updater is started *after* the orchestra boots so its periodic
-        loop never races with musician shell initialisation.
+        Discovery runs *after* musician boot so that the /health endpoint
+        is reachable while the (potentially slow) discovery work runs.
+        The updater is started last so its periodic loop never races with
+        musician shell initialisation.
         """
         await orchestra.start()
 
@@ -101,6 +101,23 @@ def create_app() -> FastAPI:
             unavailable or "none",
             len(orchestra._all_musicians()),
         )
+
+        # Run model discovery in a thread (it uses blocking I/O and
+        # subprocesses).  If models changed, reload config and activate
+        # any providers that have become available.
+        try:
+            changed = await asyncio.to_thread(
+                run_startup_discovery, config.config_path,
+            )
+            if changed:
+                new_config = load_config(config.config_path)
+                orchestra.config = new_config
+                app.state.config = new_config
+                for provider in new_config.providers:
+                    if not orchestra.available_providers.get(provider, False):
+                        await orchestra.activate_provider(provider)
+        except Exception:
+            logger.exception("Background model discovery failed")
 
         # Start the updater now that musicians are ready — its periodic
         # loop runs the first version check immediately.
@@ -118,8 +135,11 @@ def create_app() -> FastAPI:
                     await boot_task
                 except asyncio.CancelledError:
                     pass
-            await updater.stop()
-            await orchestra.stop()
+            await asyncio.gather(
+                updater.stop(),
+                orchestra.stop(),
+                return_exceptions=True,
+            )
 
     app = FastAPI(
         title="Symphony",

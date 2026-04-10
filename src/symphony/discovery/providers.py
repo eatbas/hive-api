@@ -27,10 +27,39 @@ logger = logging.getLogger("symphony.discovery")
 
 _TIMEOUT = 15
 
+_DISCOVERY_CACHE_FILE = Path.home() / ".maestro" / "symphony" / ".discovery_cache.json"
+
 
 # ---------------------------------------------------------------------------
 # Shared helpers
 # ---------------------------------------------------------------------------
+
+
+def _read_discovery_cache() -> dict:
+    """Read the discovery cache JSON.  Returns empty dict on any error."""
+    try:
+        return json.loads(_DISCOVERY_CACHE_FILE.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return {}
+
+
+def _write_discovery_cache(cache: dict) -> None:
+    """Write the discovery cache JSON."""
+    try:
+        _DISCOVERY_CACHE_FILE.parent.mkdir(parents=True, exist_ok=True)
+        _DISCOVERY_CACHE_FILE.write_text(
+            json.dumps(cache, indent=2), encoding="utf-8",
+        )
+    except OSError as exc:
+        logger.debug("Failed to write discovery cache: %s", exc)
+
+
+def _dir_mtime(path: Path) -> float:
+    """Return the modification time of a directory, or 0.0 if unavailable."""
+    try:
+        return path.stat().st_mtime
+    except OSError:
+        return 0.0
 
 
 def _read_json_file(path: Path) -> dict | None:
@@ -90,6 +119,13 @@ def _discover_claude() -> list[str] | None:
     if not pkg:
         return None
 
+    # Fast path: skip expensive rglob if the package hasn't changed.
+    cache = _read_discovery_cache()
+    pkg_mtime = _dir_mtime(pkg)
+    claude_cache = cache.get("claude", {})
+    if claude_cache.get("mtime") == pkg_mtime and claude_cache.get("models"):
+        return claude_cache["models"]
+
     # The alias array appears as: mR9=["sonnet","opus","haiku","best","sonnet[1m]",...]
     # or similar minified variable assignment in the bundle.
     for js_file in pkg.rglob("*.js"):
@@ -110,7 +146,10 @@ def _discover_claude() -> list[str] | None:
                     a for a in aliases
                     if re.fullmatch(r"[a-z]+(?:\[\w+\])?", a)
                 ]
-                return sorted(a for a in all_aliases if a in allowed)
+                result = sorted(a for a in all_aliases if a in allowed)
+                cache["claude"] = {"mtime": pkg_mtime, "models": result}
+                _write_discovery_cache(cache)
+                return result
 
     return None
 
@@ -141,6 +180,13 @@ def _discover_gemini() -> list[str] | None:
     if not bundle_dir.is_dir():
         return None
 
+    # Fast path: skip bundle scanning if the directory hasn't changed.
+    cache = _read_discovery_cache()
+    bundle_mtime = _dir_mtime(bundle_dir)
+    gemini_cache = cache.get("gemini", {})
+    if gemini_cache.get("mtime") == bundle_mtime and gemini_cache.get("models"):
+        return gemini_cache["models"]
+
     raw_models: set[str] = set()
     for js_file in bundle_dir.glob("*.js"):
         text = js_file.read_text(encoding="utf-8", errors="replace")
@@ -153,12 +199,20 @@ def _discover_gemini() -> list[str] | None:
                     models.add(token_match.group(1))
             models = {name for name in models if _GEMINI_MODEL_RE.match(name)}
             if models:
-                return filter_gemini(sorted(models))
+                result = filter_gemini(sorted(models))
+                cache["gemini"] = {"mtime": bundle_mtime, "models": result}
+                _write_discovery_cache(cache)
+                return result
         for name in re.findall(r'"(gemini-\d[a-z0-9._-]*)"', text):
             if _GEMINI_MODEL_RE.match(name):
                 raw_models.add(name)
 
-    return filter_gemini(sorted(raw_models)) if raw_models else None
+    if raw_models:
+        result = filter_gemini(sorted(raw_models))
+        cache["gemini"] = {"mtime": bundle_mtime, "models": result}
+        _write_discovery_cache(cache)
+        return result
+    return None
 
 
 # ---------------------------------------------------------------------------

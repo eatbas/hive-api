@@ -130,7 +130,20 @@ class BashSession:
                 await process.stdin.drain()
             except ConnectionResetError:
                 pass
-        await process.wait()
+        try:
+            await asyncio.wait_for(process.wait(), timeout=2.0)
+        except asyncio.TimeoutError:
+            # Graceful exit timed out — force kill.
+            if os.name == "nt":
+                await self._kill_windows_process_tree(process.pid)
+            else:
+                try:
+                    os.killpg(process.pid, signal.SIGKILL)
+                except (ProcessLookupError, PermissionError):
+                    pass
+            with contextlib.suppress(ProcessLookupError):
+                process.kill()
+            await process.wait()
         if self._reader_task:
             await self._reader_task
         self._dispose_process()
