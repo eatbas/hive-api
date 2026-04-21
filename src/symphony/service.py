@@ -12,6 +12,7 @@ from fastapi.staticfiles import StaticFiles
 from .config import load_config
 from .discovery import run_startup_discovery
 from .models import HealthResponse
+from .parent_watchdog import start_parent_watchdog, stop_parent_watchdog
 from .routes import (
     _parse_generate_response,
     chat_router,
@@ -125,6 +126,7 @@ def create_app() -> FastAPI:
 
     @asynccontextmanager
     async def lifespan(_: FastAPI):
+        start_parent_watchdog()
         boot_task = asyncio.create_task(_boot_orchestra())
         try:
             yield
@@ -136,6 +138,7 @@ def create_app() -> FastAPI:
                 except asyncio.CancelledError:
                     pass
             await asyncio.gather(
+                stop_parent_watchdog(),
                 updater.stop(),
                 orchestra.stop(),
                 return_exceptions=True,
