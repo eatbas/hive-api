@@ -76,6 +76,11 @@ def test_copilot_extra_args_appended():
     assert "--autopilot" in command.argv
 
 
+def test_copilot_model_option_schema_omits_thinking_level():
+    adapter = CopilotAdapter()
+    assert adapter.model_option_schema("claude-sonnet-4.6") == []
+
+
 def test_copilot_parse_extracts_session_id():
     adapter = CopilotAdapter()
     state = ParseState()

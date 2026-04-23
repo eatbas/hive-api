@@ -49,6 +49,27 @@ def test_kimi_resume_command_uses_session_flag():
     assert "kimi-sess-1" in command.argv
 
 
+def test_kimi_thinking_mode_can_be_disabled():
+    adapter = KimiAdapter()
+    command = adapter.build_command(
+        executable="kimi",
+        mode=ChatMode.NEW,
+        prompt="hello",
+        model="default",
+        session_ref=None,
+        provider_options={"thinking_mode": "disabled"},
+    )
+    assert "--no-thinking" in command.argv
+    assert "--thinking" not in command.argv
+
+
+def test_kimi_model_option_schema_exposes_thinking_mode():
+    adapter = KimiAdapter()
+    schema = adapter.model_option_schema("kimi-code/kimi-for-coding")
+    assert schema[0]["key"] == "thinking_mode"
+    assert schema[0]["default"] == "enabled"
+
+
 def test_kimi_parse_emits_output_delta():
     adapter = KimiAdapter()
     state = ParseState()

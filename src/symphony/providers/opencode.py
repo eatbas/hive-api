@@ -3,6 +3,7 @@ from __future__ import annotations
 from typing import Any
 
 from .base import CommandSpec, ParseState, ProviderAdapter
+from .options import boolean_thinking_schema, thinking_enabled
 from ..models import InstrumentName
 
 
@@ -30,7 +31,9 @@ class OpenCodeAdapter(ProviderAdapter):
         model: str,
         provider_options: dict[str, Any],
     ) -> CommandSpec:
-        argv = [executable, "run", "--format", "json", "--thinking"]
+        argv = [executable, "run", "--format", "json"]
+        if thinking_enabled(provider_options):
+            argv.append("--thinking")
         self._apply_model_override(argv, self._resolve_model(model))
         argv.extend(self._extra_args(provider_options))
         argv.append(prompt)
@@ -45,11 +48,17 @@ class OpenCodeAdapter(ProviderAdapter):
         session_ref: str,
         provider_options: dict[str, Any],
     ) -> CommandSpec:
-        argv = [executable, "run", "--format", "json", "--thinking", "--session", session_ref]
+        argv = [executable, "run", "--format", "json"]
+        if thinking_enabled(provider_options):
+            argv.append("--thinking")
+        argv.extend(["--session", session_ref])
         self._apply_model_override(argv, self._resolve_model(model))
         argv.extend(self._extra_args(provider_options))
         argv.append(prompt)
         return CommandSpec(argv=argv, preset_session_ref=session_ref)
+
+    def model_option_schema(self, model: str) -> list[dict[str, Any]]:
+        return boolean_thinking_schema(default="enabled")
 
     def parse_output_line(self, line: str, state: ParseState) -> list[dict[str, Any]]:
         obj = self._parse_json_or_warn(line, state)

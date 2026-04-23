@@ -46,7 +46,8 @@ Running scores can be stopped via `POST /v1/chat/{score_id}/stop`.
 | Key | Instruments | Description |
 |-----|-----------|-------------|
 | `extra_args` | All | Raw CLI flags appended to the command. |
-| `effort` | Claude | Reasoning effort (`low`, `medium`, `high`). Omit for CLI default. |
+| `thinking_level` | Codex, supported Claude models | Thinking level exposed by `/v1/models`. |
+| `thinking_mode` | Kimi, OpenCode | Toggle native thinking mode. |
 | `max_turns` | Claude | Maximum autonomous tool-use turns. Omit for CLI default. |
 """
 

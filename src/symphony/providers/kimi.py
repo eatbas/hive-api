@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 import shlex
+from typing import Any
 
 from .base import CommandSpec, ParseState, ProviderAdapter
+from .options import boolean_thinking_schema, thinking_enabled
 from ..models import InstrumentName
 from ..shells import to_bash_path
 
@@ -53,16 +55,23 @@ class KimiAdapter(ProviderAdapter):
         argv = [
             executable,
             "--yolo",
-            "--thinking",
-            "--session",
-            session_ref,
-            *self._AUTOMATION_ARGS,
-            "--prompt",
-            prompt,
         ]
+        argv.append("--thinking" if thinking_enabled(provider_options) else "--no-thinking")
+        argv.extend(
+            [
+                "--session",
+                session_ref,
+                *self._AUTOMATION_ARGS,
+                "--prompt",
+                prompt,
+            ]
+        )
         self._apply_model_override(argv, model)
         argv.extend(self._extra_args(provider_options))
         return argv
+
+    def model_option_schema(self, model: str) -> list[dict[str, Any]]:
+        return boolean_thinking_schema(default="enabled")
 
     def make_shell_script(self, workspace_path: str, command: CommandSpec) -> str:
         workspace = shlex.quote(to_bash_path(workspace_path))

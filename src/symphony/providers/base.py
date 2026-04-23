@@ -154,6 +154,9 @@ class ProviderAdapter:
     def parse_output_line(self, line: str, state: ParseState) -> list[dict[str, Any]]:
         raise NotImplementedError
 
+    def model_option_schema(self, model: str) -> list[dict[str, Any]]:
+        return []
+
     def make_shell_script(self, workspace_path: str, command: CommandSpec) -> str:
         workspace = shlex.quote(to_bash_path(workspace_path))
         shell_command = shlex.join(self._normalize_argv(command.argv))

@@ -10,7 +10,9 @@ from ..providers.base import set_bash_path
 from ..providers.registry import build_instrument_registry
 from ..score_store import ScoreStore
 from ..shells import ScoreCancelledError, detect_bash_path
+from .capabilities import build_capabilities, build_health_details, build_model_details, build_musician_info
 from .musician import Musician
+from .provider_runtime import activate_provider as activate_provider_runtime
 from .score import ScoreHandle, now_rfc3339, stopped_event
 
 logger = logging.getLogger("symphony.orchestra")
@@ -167,10 +169,6 @@ class Orchestra:
             self._pool_locks[key] = lock
         return lock
 
-    # ------------------------------------------------------------------
-    # Score registry
-    # ------------------------------------------------------------------
-
     def register_score(self, handle: ScoreHandle) -> None:
         """Store a score handle so it can be looked up for cancellation."""
         handle.set_persist_callback(self.persist_snapshot)
@@ -250,57 +248,18 @@ class Orchestra:
             for sid in terminal_ids[:excess]:
                 del self._scores[sid]
 
-    # ------------------------------------------------------------------
-    # Instrument capabilities
-    # ------------------------------------------------------------------
-
     def capabilities(self) -> list[ProviderCapability]:
-        capabilities: list[ProviderCapability] = []
-        for instrument, adapter in self.registry.items():
-            instrument_config: InstrumentConfig = self.config.providers[instrument]
-            capabilities.append(
-                ProviderCapability(
-                    provider=instrument,
-                    executable=adapter.resolve_executable(instrument_config.executable),
-                    enabled=instrument_config.enabled,
-                    available=self.available_providers.get(instrument, False),
-                    models=instrument_config.models,
-                    supports_resume=adapter.supports_resume,
-                    supports_model_override=adapter.supports_model_override,
-                    session_reference_format=adapter.session_reference_format,
-                )
-            )
-        return capabilities
+        return build_capabilities(
+            config=self.config,
+            registry=self.registry,
+            available_providers=self.available_providers,
+        )
 
     def model_details(self) -> list[ModelDetail]:
-        details: list[ModelDetail] = []
-        seen: set[tuple[InstrumentName, str]] = set()
-        for musician in self._all_musicians():
-            key = (musician.provider, musician.model)
-            if key in seen:
-                continue
-            seen.add(key)
-            adapter = self.registry[musician.provider]
-            details.append(
-                ModelDetail(
-                    provider=musician.provider,
-                    model=musician.model,
-                    ready=musician.ready,
-                    busy=musician.busy,
-                    supports_resume=adapter.supports_resume,
-                    chat_request_example={
-                        "provider": musician.provider.value,
-                        "model": musician.model,
-                        "workspace_path": "/path/to/your/project",
-                        "mode": "new",
-                        "prompt": "Your prompt here",
-                    },
-                )
-            )
-        return details
+        return build_model_details(musicians=self._all_musicians(), registry=self.registry)
 
     def musician_info(self) -> list[MusicianInfo]:
-        return [musician.info() for musician in self._all_musicians()]
+        return build_musician_info(self._all_musicians())
 
     def musicians_for_provider(self, provider: InstrumentName) -> list[Musician]:
         return [musician for musician in self._all_musicians() if musician.provider == provider]
@@ -311,36 +270,7 @@ class Orchestra:
         await asyncio.gather(*(m.start() for m in musicians))
 
     async def activate_provider(self, provider: InstrumentName) -> bool:
-        if self.available_providers.get(provider, False):
-            return True
-
-        instrument_config = self.config.providers.get(provider)
-        if instrument_config is None or not instrument_config.enabled:
-            return False
-
-        adapter = self.registry[provider]
-        if not adapter.is_available(instrument_config.executable):
-            return False
-
-        executable = adapter.resolve_executable(instrument_config.executable)
-        self.available_providers[provider] = True
-        logger.info("Instrument %s: CLI now available at '%s' -- creating musicians", provider.value, executable)
-        for model in instrument_config.models:
-            if (provider, model) not in self.musicians:
-                musician = Musician(
-                    provider=provider,
-                    model=model,
-                    adapter=adapter,
-                    executable=executable,
-                    shell_path=self.shell_path,
-                    default_options=instrument_config.default_options,
-                    session_models=self.session_models,
-                    cli_timeout=instrument_config.cli_timeout,
-                    idle_timeout=instrument_config.idle_timeout,
-                )
-                await musician.start()
-                self.musicians[(provider, model)] = [musician]
-        return True
+        return await activate_provider_runtime(self, provider)
 
     def get_idle_musician(self, provider: InstrumentName) -> Musician | None:
         for musician in self.musicians_for_provider(provider):
@@ -362,8 +292,4 @@ class Orchestra:
         return None
 
     def health_details(self) -> list[str]:
-        details: list[str] = []
-        for musician in self._all_musicians():
-            if musician.last_error:
-                details.append(f"{musician.provider.value}/{musician.model}: {musician.last_error}")
-        return details
+        return build_health_details(self._all_musicians())

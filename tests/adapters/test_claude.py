@@ -61,6 +61,41 @@ def test_claude_resume_command_accepts_max_turns_override():
     assert command.argv[max_turns_index + 1] == "200"
 
 
+def test_claude_command_accepts_thinking_level():
+    adapter = ClaudeAdapter()
+    command = adapter.build_command(
+        executable="claude",
+        mode=ChatMode.NEW,
+        prompt="hello",
+        model="default",
+        session_ref=None,
+        provider_options={"thinking_level": "high"},
+    )
+    assert "--effort" in command.argv
+    effort_index = command.argv.index("--effort")
+    assert command.argv[effort_index + 1] == "high"
+
+
+def test_claude_model_option_schema_exposes_thinking_level():
+    adapter = ClaudeAdapter()
+    schema = adapter.model_option_schema("opus")
+    assert schema[0]["key"] == "thinking_level"
+    assert schema[0]["default"] == "xhigh"
+    assert [choice["value"] for choice in schema[0]["choices"]] == ["low", "medium", "high", "xhigh", "max"]
+
+
+def test_claude_haiku_model_option_schema_omits_thinking_level():
+    adapter = ClaudeAdapter()
+    assert adapter.model_option_schema("haiku") == []
+
+
+def test_claude_sonnet_model_option_schema_omits_opus_only_efforts():
+    adapter = ClaudeAdapter()
+    schema = adapter.model_option_schema("sonnet")
+    assert schema[0]["default"] == "high"
+    assert [choice["value"] for choice in schema[0]["choices"]] == ["low", "medium", "high"]
+
+
 def test_claude_parse_extracts_session_id():
     adapter = ClaudeAdapter()
     state = ParseState()

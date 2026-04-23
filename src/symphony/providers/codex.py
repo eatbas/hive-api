@@ -1,6 +1,10 @@
 from __future__ import annotations
 
+from typing import Any
+
 from .base import CommandSpec, ParseState, ProviderAdapter
+from .codex_options import SUPPORTED_REASONING_EFFORTS, codex_model_options
+from .options import get_thinking_level
 from ..models import InstrumentName
 
 
@@ -13,6 +17,7 @@ class CodexAdapter(ProviderAdapter):
     def build_new_command(self, *, executable: str, prompt: str, model: str, provider_options: dict) -> CommandSpec:
         argv = [executable, "exec", "--json", "--full-auto"]
         self._apply_model_override(argv, self._resolve_model(model), flag="-m")
+        self._apply_reasoning_effort(argv, provider_options)
         argv.extend(self._extra_args(provider_options))
         argv.append(prompt)
         return CommandSpec(argv=argv)
@@ -20,6 +25,7 @@ class CodexAdapter(ProviderAdapter):
     def build_resume_command(self, *, executable: str, prompt: str, model: str, session_ref: str, provider_options: dict) -> CommandSpec:
         argv = [executable, "exec", "resume", "--json", "--full-auto"]
         self._apply_model_override(argv, self._resolve_model(model), flag="-m")
+        self._apply_reasoning_effort(argv, provider_options)
         argv.extend(self._extra_args(provider_options))
         argv.extend([session_ref, prompt])
         return CommandSpec(argv=argv, preset_session_ref=session_ref)
@@ -45,3 +51,12 @@ class CodexAdapter(ProviderAdapter):
 
     def _resolve_model(self, model: str) -> str:
         return self.model_aliases.get(model, model)
+
+    def model_option_schema(self, model: str) -> list[dict[str, Any]]:
+        return codex_model_options(self._resolve_model(model))
+
+    def _apply_reasoning_effort(self, argv: list[str], provider_options: dict) -> None:
+        raw = get_thinking_level(provider_options, allowed=tuple(sorted(SUPPORTED_REASONING_EFFORTS)))
+        if raw is None:
+            return
+        argv.extend(["-c", f'model_reasoning_effort="{raw}"'])

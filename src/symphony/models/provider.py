@@ -20,6 +20,24 @@ class ProviderCapability(BaseModel):
     session_reference_format: str = Field(description="Format of instrument session reference.")
 
 
+class ProviderOptionChoice(BaseModel):
+    """Allowed value for a provider option exposed to API clients."""
+
+    value: str = Field(description="Machine value to send in provider_options.")
+    label: str = Field(description="Human-readable option label.")
+    description: str | None = Field(default=None, description="Short explanation of the option.")
+
+
+class ProviderOptionDefinition(BaseModel):
+    """Provider option clients can render for a specific model."""
+
+    key: str = Field(description="provider_options key to send with chat requests.")
+    label: str = Field(description="Human-readable control label.")
+    type: Literal["select"] = Field(description="UI control type.")
+    default: str | None = Field(default=None, description="Default value for this model.")
+    choices: list[ProviderOptionChoice] = Field(description="Allowed values for this option.")
+
+
 class ModelDetail(BaseModel):
     """Detailed information about a single configured model."""
 
@@ -28,6 +46,10 @@ class ModelDetail(BaseModel):
     ready: bool = Field(description="Whether the musician is ready to accept requests.")
     busy: bool = Field(description="Whether the musician is currently processing a request.")
     supports_resume: bool = Field(description="Whether this model supports session resume.")
+    provider_options_schema: list[ProviderOptionDefinition] = Field(
+        default_factory=list,
+        description="Provider options supported by this model.",
+    )
     chat_request_example: dict[str, Any] = Field(description="Example POST /v1/chat body.")
 
 

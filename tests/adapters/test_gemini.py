@@ -98,6 +98,11 @@ def test_extra_args_appended_to_command():
     assert "--yolo" in command.argv
 
 
+def test_gemini_model_option_schema_omits_thinking_level():
+    adapter = GeminiAdapter()
+    assert adapter.model_option_schema("gemini-3-flash-preview") == []
+
+
 def test_extra_args_rejects_non_list():
     adapter = GeminiAdapter()
     with pytest.raises(ValueError, match="extra_args must be a list"):

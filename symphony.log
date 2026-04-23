@@ -146,3 +146,22 @@ INFO:     172.21.0.4:53890 - "GET /v1/chat/93a5ba5535864ad1b4264c72d0e1f9f5 HTTP
 INFO:     172.21.0.4:53906 - "GET /v1/chat/93a5ba5535864ad1b4264c72d0e1f9f5 HTTP/1.1" 200 OK
 INFO:     172.21.0.4:53920 - "GET /v1/models HTTP/1.1" 200 OK
 INFO:     172.21.0.4:53924 - "GET /v1/chat/93a5ba5535864ad1b4264c72d0e1f9f5 HTTP/1.1" 200 OK
+INFO:     Started server process [1524802]
+INFO:     Waiting for application startup.
+Instrument copilot: CLI 'copilot' not found -- skipping musician creation
+Instrument opencode: CLI 'opencode' not found -- skipping musician creation
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://0.0.0.0:8080 (Press CTRL+C to quit)
+INFO:     127.0.0.1:52060 - "GET /v1/models HTTP/1.1" 200 OK
+INFO:     127.0.0.1:34884 - "GET /v1/health HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:34804 - "GET /health HTTP/1.1" 200 OK
+INFO:     172.21.0.5:45508 - "GET /v1/models HTTP/1.1" 200 OK
+INFO:     Started server process [1546100]
+INFO:     Waiting for application startup.
+Instrument copilot: CLI 'copilot' not found -- skipping musician creation
+Instrument opencode: CLI 'opencode' not found -- skipping musician creation
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://0.0.0.0:8080 (Press CTRL+C to quit)
+INFO:     127.0.0.1:58976 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52692 - "GET /v1/models HTTP/1.1" 200 OK
+INFO:     172.21.0.5:50542 - "GET /v1/models HTTP/1.1" 200 OK

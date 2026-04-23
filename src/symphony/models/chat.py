@@ -35,7 +35,9 @@ class ChatRequest(BaseModel):
         description=(
             "Instrument-specific passthrough options. "
             "Common keys: extra_args (list[str]) for raw CLI flags; "
-            "effort ('low'|'medium'|'high') and max_turns (int) for Claude."
+            "thinking_level for Codex and supported Claude models; "
+            "thinking_mode ('enabled'|'disabled') for providers with a thinking toggle; "
+            "max_turns (int) for Claude."
         ),
     )
 

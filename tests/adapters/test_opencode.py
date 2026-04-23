@@ -75,6 +75,26 @@ def test_opencode_extra_args_appended():
     assert "--verbose" in command.argv
 
 
+def test_opencode_thinking_mode_can_be_disabled():
+    adapter = OpenCodeAdapter()
+    command = adapter.build_command(
+        executable="opencode",
+        mode=ChatMode.NEW,
+        prompt="hello",
+        model="default",
+        session_ref=None,
+        provider_options={"thinking_mode": "disabled"},
+    )
+    assert "--thinking" not in command.argv
+
+
+def test_opencode_model_option_schema_exposes_thinking_mode():
+    adapter = OpenCodeAdapter()
+    schema = adapter.model_option_schema("glm-5")
+    assert schema[0]["key"] == "thinking_mode"
+    assert schema[0]["default"] == "enabled"
+
+
 def test_opencode_parse_extracts_session_id():
     adapter = OpenCodeAdapter()
     state = ParseState()

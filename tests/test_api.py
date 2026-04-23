@@ -240,6 +240,7 @@ def test_models_endpoint_returns_all_models(config_path):
             assert "ready" in m
             assert "busy" in m
             assert "supports_resume" in m
+            assert "provider_options_schema" in m
             assert "chat_request_example" in m
             example = m["chat_request_example"]
             assert example["provider"] == m["provider"]
@@ -247,6 +248,7 @@ def test_models_endpoint_returns_all_models(config_path):
             assert example["mode"] == "new"
             assert "prompt" in example
             assert "workspace_path" in example
+            assert "provider_options" in example
 
 
 def test_cors_headers_present(config_path):

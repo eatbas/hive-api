@@ -31,6 +31,20 @@ def test_codex_new_command_includes_model_when_not_default():
     assert "o3" in command.argv
 
 
+def test_codex_new_command_includes_thinking_level():
+    adapter = CodexAdapter()
+    command = adapter.build_command(
+        executable="codex",
+        mode=ChatMode.NEW,
+        prompt="hello",
+        model="gpt-5.5",
+        session_ref=None,
+        provider_options={"thinking_level": "high"},
+    )
+    assert "-c" in command.argv
+    assert 'model_reasoning_effort="high"' in command.argv
+
+
 def test_codex_resume_command_uses_json_and_full_auto():
     adapter = CodexAdapter()
     command = adapter.build_command(

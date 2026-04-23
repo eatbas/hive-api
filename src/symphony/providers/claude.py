@@ -1,6 +1,9 @@
 from __future__ import annotations
 
+from typing import Any
+
 from .base import CommandSpec, ParseState, ProviderAdapter
+from .options import get_thinking_level, thinking_level_schema
 from ..models import InstrumentName
 
 
@@ -27,6 +30,7 @@ class ClaudeAdapter(ProviderAdapter):
             prompt,
         ]
         self._apply_model_override(argv, model)
+        self._apply_effort(argv, model, provider_options)
         self._apply_max_turns(argv, provider_options)
         argv.extend(self._extra_args(provider_options))
         return CommandSpec(argv=argv, preset_session_ref=session_ref)
@@ -40,16 +44,39 @@ class ClaudeAdapter(ProviderAdapter):
             "stream-json",
             "--enable-auto-mode",
             "--no-chrome",
-            "--effort",
-            "high",
             "--resume",
             session_ref,
             prompt,
         ]
         self._apply_model_override(argv, model)
+        self._apply_effort(argv, model, provider_options)
         self._apply_max_turns(argv, provider_options)
         argv.extend(self._extra_args(provider_options))
         return CommandSpec(argv=argv, preset_session_ref=session_ref)
+
+    def model_option_schema(self, model: str) -> list[dict[str, Any]]:
+        levels = self._effort_levels_for_model(model)
+        if not levels:
+            return []
+        default = "xhigh" if "xhigh" in levels else "high"
+        return thinking_level_schema(levels=levels, default=default)
+
+    def _apply_effort(self, argv: list[str], model: str, provider_options: dict) -> None:
+        levels = self._effort_levels_for_model(model)
+        effort = get_thinking_level(provider_options, allowed=levels)
+        if effort:
+            argv.extend(["--effort", effort])
+
+    @staticmethod
+    def _effort_levels_for_model(model: str) -> tuple[str, ...]:
+        normalized = model.lower()
+        if "haiku" in normalized:
+            return ()
+        if "opus" in normalized:
+            return ("low", "medium", "high", "xhigh", "max")
+        if "sonnet" in normalized:
+            return ("low", "medium", "high")
+        return ("low", "medium", "high")
 
     def _apply_max_turns(self, argv: list[str], provider_options: dict) -> None:
         raw = provider_options.get("max_turns")
