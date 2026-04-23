@@ -17,3 +17,8 @@ frontend/web/node_modules/
 frontend/web/dist/
 
 .maestro/
+
+# Logs
+*.log
+*.log.*
+logs/
