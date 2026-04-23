@@ -1,0 +1,20 @@
+services:
+  symphony-web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: symphony-web
+    expose:
+      - "80"
+    restart: unless-stopped
+    networks:
+      - eameets-network
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:80"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+networks:
+  eameets-network:
+    external: true
