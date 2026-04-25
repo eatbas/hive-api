@@ -177,10 +177,90 @@ class TestIsProviderIdle:
             await manager.stop()
 
 
+class TestProbeVersionsOnly:
+    """The probe-only path is what the lazy GET /v1/cli-versions hits on
+    a cold cache. It must run version checks in parallel and never trigger
+    an install — that's what makes the first response arrive in seconds
+    instead of minutes."""
+
+    @pytest.mark.asyncio()
+    async def test_returns_status_for_each_available_provider(self, loaded_config):
+        manager = Orchestra(loaded_config)
+        await manager.start()
+        try:
+            checker = CLIUpdater(
+                manager=manager,
+                config=UpdaterConfig(enabled=True, interval_hours=4.0, auto_update=True),
+            )
+            with patch.object(
+                checker, "get_current_version", new_callable=AsyncMock
+            ) as mock_curr, patch.object(
+                checker, "get_latest_version", new_callable=AsyncMock
+            ) as mock_latest:
+                mock_curr.return_value = "1.0.0"
+                mock_latest.return_value = "1.0.0"
+                results = await checker.probe_versions_only()
+                assert len(results) == 6
+                assert all(not status.needs_update for status in results)
+        finally:
+            await manager.stop()
+
+    @pytest.mark.asyncio()
+    async def test_does_not_trigger_install_when_outdated(self, loaded_config):
+        """Even with auto_update=True and updates available, probe-only
+        must never call ``update_cli`` — that's the whole point of the
+        split."""
+        manager = Orchestra(loaded_config)
+        await manager.start()
+        try:
+            checker = CLIUpdater(
+                manager=manager,
+                config=UpdaterConfig(enabled=True, interval_hours=4.0, auto_update=True),
+            )
+            with patch.object(
+                checker, "get_current_version", new_callable=AsyncMock
+            ) as mock_curr, patch.object(
+                checker, "get_latest_version", new_callable=AsyncMock
+            ) as mock_latest, patch.object(
+                checker, "update_cli", new_callable=AsyncMock
+            ) as mock_update:
+                mock_curr.return_value = "1.0.0"
+                mock_latest.return_value = "1.1.0"
+                results = await checker.probe_versions_only()
+                assert len(results) == 6
+                assert all(status.needs_update for status in results)
+                mock_update.assert_not_called()
+        finally:
+            await manager.stop()
+
+    @pytest.mark.asyncio()
+    async def test_populates_last_results_cache(self, loaded_config):
+        manager = Orchestra(loaded_config)
+        await manager.start()
+        try:
+            checker = CLIUpdater(
+                manager=manager,
+                config=UpdaterConfig(enabled=True, interval_hours=4.0, auto_update=False),
+            )
+            with patch.object(
+                checker, "get_current_version", new_callable=AsyncMock
+            ) as mock_curr, patch.object(
+                checker, "get_latest_version", new_callable=AsyncMock
+            ) as mock_latest:
+                mock_curr.return_value = "1.0.0"
+                mock_latest.return_value = "1.0.0"
+                await checker.probe_versions_only()
+                assert len(checker.last_results) == 6
+        finally:
+            await manager.stop()
+
+
 class TestAPIEndpoints:
     def test_cli_versions_lazy_loads_when_cache_empty(self, config_path):
-        """GET /v1/cli-versions triggers a check when the updater cache is
-        empty, so callers don't see an empty window during Symphony start-up."""
+        """GET /v1/cli-versions runs a probe-only pass when the updater
+        cache is empty, so callers don't see an empty window during
+        Symphony start-up — and the response arrives in seconds rather
+        than blocking on installs."""
         from fastapi.testclient import TestClient
         from symphony.service import create_app
 
@@ -192,7 +272,10 @@ class TestAPIEndpoints:
             ) as mock_curr, patch(
                 "symphony.updater.updater.CLIUpdater.get_latest_version",
                 new_callable=AsyncMock,
-            ) as mock_latest:
+            ) as mock_latest, patch(
+                "symphony.updater.updater.CLIUpdater.update_cli",
+                new_callable=AsyncMock,
+            ) as mock_update:
                 mock_curr.return_value = "1.0.0"
                 mock_latest.return_value = "1.0.0"
                 response = client.get("/v1/cli-versions")
@@ -201,6 +284,33 @@ class TestAPIEndpoints:
                 assert len(data) == 6
                 assert mock_curr.await_count >= 1
                 assert mock_latest.await_count >= 1
+                # Lazy GET must never block on installs.
+                mock_update.assert_not_called()
+
+    def test_cli_versions_get_does_not_install_when_outdated(self, config_path):
+        """GET must not run an install even when versions are stale —
+        installs are the periodic loop's job, not the request's."""
+        from fastapi.testclient import TestClient
+        from symphony.service import create_app
+
+        app = create_app()
+        with TestClient(app) as client:
+            with patch(
+                "symphony.updater.updater.CLIUpdater.get_current_version",
+                new_callable=AsyncMock,
+            ) as mock_curr, patch(
+                "symphony.updater.updater.CLIUpdater.get_latest_version",
+                new_callable=AsyncMock,
+            ) as mock_latest, patch(
+                "symphony.updater.updater.CLIUpdater.update_cli",
+                new_callable=AsyncMock,
+            ) as mock_update:
+                mock_curr.return_value = "1.0.0"
+                mock_latest.return_value = "1.1.0"
+                response = client.get("/v1/cli-versions")
+                assert response.status_code == 200
+                assert all(item["needs_update"] for item in response.json())
+                mock_update.assert_not_called()
 
     def test_cli_versions_returns_cached_results(self, config_path):
         """After results are cached, subsequent GETs don't trigger a new check."""

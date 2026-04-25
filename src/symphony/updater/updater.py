@@ -8,8 +8,10 @@ from ..config import UpdaterConfig
 from ..discovery import discover_provider
 from ..models import CLIVersionStatus, InstrumentName
 from ..orchestra import Orchestra, refresh_provider_models
-from .registry import CLIPackageInfo, PACKAGE_REGISTRY, detect_install_method, needs_update as _needs_update
+from . import lifecycle
+from .registry import CLIPackageInfo, PACKAGE_REGISTRY, needs_update as _needs_update
 from .single_provider import update_single_provider_impl
+from .update_runner import run_update
 from .version_checker import (
     get_current_version,
     get_latest_version,
@@ -53,65 +55,12 @@ class CLIUpdater:
         return all(not m.busy and m.queue.qsize() == 0 for m in musicians)
 
     async def update_cli(self, pkg_info: CLIPackageInfo, *, executable: str | None = None) -> bool:
-        # CLIs with a native update command always use that — it works
-        # regardless of how the CLI was installed (npm, standalone, etc.).
-        # Only fall back to package-manager detection for CLIs without one.
-        if pkg_info.update_cmd:
-            method = "native"
-        else:
-            method = pkg_info.manager
-            if executable:
-                detected = detect_install_method(executable)
-                if detected != "unknown":
-                    method = detected
-
-        logger.info("Updating %s (method=%s) ...", pkg_info.package, method)
-
-        if method == "native":
-            # Pipe ``yes`` to auto-confirm interactive prompts (e.g.
-            # ``opencode upgrade``) that would otherwise hang the shell.
-            cmd_str = f"yes 2>/dev/null | {pkg_info.update_cmd} 2>&1\n__symphony_exit=$?"
-        elif method == "npm":
-            cmd_str = f"npm install -g {pkg_info.package}@latest 2>&1\n__symphony_exit=$?"
-        elif method == "uv":
-            cmd_str = f"uv tool upgrade {pkg_info.package} --no-cache 2>&1\n__symphony_exit=$?"
-        else:
-            return False
-
-        musician = self.manager.get_idle_musician(pkg_info.provider)
-        if musician is not None and musician.ready:
-            try:
-                code, output = await musician.run_quick_command(cmd_str, timeout=120)
-                if code == 0:
-                    logger.info("Successfully updated %s", pkg_info.package)
-                    return True
-                logger.error("Update failed for %s (shell): %s", pkg_info.package, output)
-                return False
-            except asyncio.TimeoutError:
-                logger.warning("Shell update timed out for %s, restarting musician shell", pkg_info.package)
-                await musician.stop()
-                await musician.start()
-                return False
-            except Exception:
-                logger.debug("Shell update failed for %s, falling back to subprocess", pkg_info.package)
-
-        if method == "native":
-            # Split the update_cmd into executable and args.
-            parts = pkg_info.update_cmd.split()
-            code, output = await self._run_cmd(*parts, timeout=120)
-        elif method == "npm":
-            code, output = await self._run_cmd("npm", "install", "-g", f"{pkg_info.package}@latest", timeout=120)
-        elif method == "uv":
-            code, output = await self._run_cmd("uv", "tool", "upgrade", pkg_info.package, "--no-cache", timeout=120)
-        else:
-            return False
-
-        if code != 0:
-            logger.error("Update failed for %s: %s", pkg_info.package, output)
-            return False
-
-        logger.info("Successfully updated %s", pkg_info.package)
-        return True
+        return await run_update(
+            manager=self.manager,
+            run_cmd=self._run_cmd,
+            pkg_info=pkg_info,
+            executable=executable,
+        )
 
     async def _rediscover_models(self, provider: InstrumentName) -> None:
         """Run model discovery for *provider* after a successful CLI update.
@@ -156,46 +105,57 @@ class CLIUpdater:
             update_skipped_reason=skip_reason,
         )
 
-    async def _check_single_provider(self, provider: InstrumentName, now: str, next_check: str) -> CLIVersionStatus | None:
+    def _available_providers(self) -> list[InstrumentName]:
+        return [
+            p
+            for p in self.manager.config.providers
+            if self.manager.config.providers[p].enabled
+            and self.manager.available_providers.get(p, False)
+        ]
+
+    def _resolve_provider_context(
+        self, provider: InstrumentName
+    ) -> tuple[object, str | None, CLIPackageInfo] | None:
+        """Return ``(adapter, executable, pkg_info)`` if all three are
+        available, else ``None``. Pure dict lookups — no I/O, safe to
+        call repeatedly."""
         provider_config = self.manager.config.providers.get(provider)
         if provider_config is None or not provider_config.enabled:
             return None
-
         adapter = self.manager.registry.get(provider)
         if adapter is None:
             return None
-
         executable = adapter.resolve_executable(provider_config.executable)
         pkg_info = PACKAGE_REGISTRY.get(adapter.default_executable)
         if pkg_info is None:
             return None
+        return adapter, executable, pkg_info
+
+    async def _probe_single_provider(
+        self, provider: InstrumentName, now: str, next_check: str
+    ) -> CLIVersionStatus | None:
+        """Run the version probe for *provider* without ever installing.
+
+        Used by the lazy GET path so the first response arrives in
+        seconds, and reused by ``_check_single_provider`` so the install
+        path inherits the same probe logic instead of duplicating it."""
+        ctx = self._resolve_provider_context(provider)
+        if ctx is None:
+            return None
+        adapter, executable, pkg_info = ctx
+        resolved_exe = executable or adapter.default_executable
 
         current, latest = await asyncio.gather(
-            self.get_current_version(executable or adapter.default_executable, provider),
+            self.get_current_version(resolved_exe, provider),
             self.get_latest_version(pkg_info),
         )
 
         update_needed = _needs_update(current, latest)
-        skip_reason: str | None = None
-        last_updated: str | None = None
-
-        if update_needed and self.config.auto_update:
-            if self.is_provider_idle(provider):
-                success = await self.update_cli(pkg_info, executable=executable or adapter.default_executable)
-                if success:
-                    await self.manager.restart_provider(provider)
-                    await self.manager.activate_provider(provider)
-                    await self._rediscover_models(provider)
-                    last_updated = datetime.now(timezone.utc).isoformat()
-                    current = await self.get_current_version(executable or adapter.default_executable, provider)
-                    update_needed = _needs_update(current, latest)
-                else:
-                    skip_reason = "update command failed"
-            else:
-                skip_reason = "musicians busy"
-                logger.warning("Skipping update for %s: musicians are busy", provider.value)
-        elif update_needed and not self.config.auto_update:
-            skip_reason = "auto_update disabled"
+        skip_reason = (
+            "auto_update disabled"
+            if update_needed and not self.config.auto_update
+            else None
+        )
 
         return self._build_status(
             provider=provider,
@@ -205,8 +165,60 @@ class CLIUpdater:
             needs_update=update_needed,
             now=now,
             next_check=next_check,
-            last_updated=last_updated,
             skip_reason=skip_reason,
+        )
+
+    async def _check_single_provider(
+        self, provider: InstrumentName, now: str, next_check: str
+    ) -> CLIVersionStatus | None:
+        probe = await self._probe_single_provider(provider, now, next_check)
+        if probe is None or not probe.needs_update or not self.config.auto_update:
+            return probe
+
+        ctx = self._resolve_provider_context(provider)
+        assert ctx is not None  # probe would have returned None otherwise
+        adapter, executable, pkg_info = ctx
+        resolved_exe = executable or adapter.default_executable
+
+        if not self.is_provider_idle(provider):
+            logger.warning("Skipping update for %s: musicians are busy", provider.value)
+            return self._build_status(
+                provider=provider,
+                executable=executable,
+                current_version=probe.current_version,
+                latest_version=probe.latest_version,
+                needs_update=True,
+                now=now,
+                next_check=next_check,
+                skip_reason="musicians busy",
+            )
+
+        success = await self.update_cli(pkg_info, executable=resolved_exe)
+        if not success:
+            return self._build_status(
+                provider=provider,
+                executable=executable,
+                current_version=probe.current_version,
+                latest_version=probe.latest_version,
+                needs_update=True,
+                now=now,
+                next_check=next_check,
+                skip_reason="update command failed",
+            )
+
+        await self.manager.restart_provider(provider)
+        await self.manager.activate_provider(provider)
+        await self._rediscover_models(provider)
+        current = await self.get_current_version(resolved_exe, provider)
+        return self._build_status(
+            provider=provider,
+            executable=executable,
+            current_version=current,
+            latest_version=probe.latest_version,
+            needs_update=_needs_update(current, probe.latest_version),
+            now=now,
+            next_check=next_check,
+            last_updated=datetime.now(timezone.utc).isoformat(),
         )
 
     async def check_single_provider(self, provider: InstrumentName) -> CLIVersionStatus | None:
@@ -217,17 +229,29 @@ class CLIUpdater:
             self._cache_single(result)
         return result
 
+    async def probe_versions_only(self) -> list[CLIVersionStatus]:
+        """Parallel version probes for every available provider — no installs.
+
+        Returns in seconds rather than minutes, so it is safe to call
+        from request paths. Auto-updates run via :meth:`_periodic_loop`,
+        never inside the request that triggers this method."""
+        now = datetime.now(timezone.utc).isoformat()
+        next_check = self._next_check_at()
+        providers = self._available_providers()
+        probe_results = await asyncio.gather(
+            *(self._probe_single_provider(p, now, next_check) for p in providers)
+        )
+        results = [r for r in probe_results if r is not None]
+        self._last_results = results
+        return results
+
     async def check_and_update_all(self) -> list[CLIVersionStatus]:
         now = datetime.now(timezone.utc).isoformat()
         next_check = self._next_check_at()
-
-        providers = [
-            p
-            for p in self.manager.config.providers
-            if self.manager.config.providers[p].enabled
-            and self.manager.available_providers.get(p, False)
-        ]
-        check_results = await asyncio.gather(*(self._check_single_provider(p, now, next_check) for p in providers))
+        providers = self._available_providers()
+        check_results = await asyncio.gather(
+            *(self._check_single_provider(p, now, next_check) for p in providers)
+        )
         results = [r for r in check_results if r is not None]
         self._last_results = results
         return results
@@ -240,45 +264,11 @@ class CLIUpdater:
         if not any(r.provider == result.provider for r in self._last_results):
             self._last_results.append(result)
 
-    async def _periodic_loop(self) -> None:
-        while True:
-            try:
-                results = await self.check_and_update_all()
-                for status in results:
-                    if status.needs_update:
-                        logger.info(
-                            "%s: %s -> %s (update %s)",
-                            status.provider.value,
-                            status.current_version,
-                            status.latest_version,
-                            status.update_skipped_reason or "applied",
-                        )
-                    else:
-                        logger.info("%s: %s (up to date)", status.provider.value, status.current_version)
-            except Exception:
-                logger.exception("Error during periodic CLI version check")
-            await asyncio.sleep(self.config.interval_hours * 3600)
-
     def start(self) -> None:
-        if not self.config.enabled:
-            logger.info("CLI updater is disabled")
-            return
-        if self._task is None:
-            logger.info(
-                "Starting CLI updater (interval=%.1fh, auto_update=%s)",
-                self.config.interval_hours,
-                self.config.auto_update,
-            )
-            self._task = asyncio.create_task(self._periodic_loop())
+        lifecycle.start(self)
 
     async def stop(self) -> None:
-        if self._task is not None:
-            self._task.cancel()
-            try:
-                await self._task
-            except asyncio.CancelledError:
-                pass
-            self._task = None
+        await lifecycle.stop(self)
 
     @property
     def last_results(self) -> list[CLIVersionStatus]:

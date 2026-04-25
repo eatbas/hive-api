@@ -20,11 +20,13 @@ def _require_available(request: Request, provider: InstrumentName) -> None:
 
 @router.get("/v1/cli-versions", summary="List CLI version statuses", response_model=list[CLIVersionStatus])
 async def cli_versions(request: Request) -> list[CLIVersionStatus]:
-    """Return cached CLI version statuses.
+    """Return CLI version statuses.
 
-    If the periodic updater has not completed its first pass yet,
-    trigger a synchronous check on demand so callers never observe the
-    transient empty-cache window during Symphony start-up.
+    Fast path. Returns the cache when populated. On a cold cache, runs
+    a probe-only pass — current + latest version per provider, in
+    parallel, no install — so the first response arrives in seconds
+    rather than minutes. Auto-updates run via the periodic updater
+    loop, never inside this request.
     """
     orchestra = get_orchestra(request)
     updater = get_updater(request)
@@ -32,7 +34,7 @@ async def cli_versions(request: Request) -> list[CLIVersionStatus]:
 
     results = updater.last_results
     if not results and available:
-        results = await updater.check_and_update_all()
+        results = await updater.probe_versions_only()
 
     return [r for r in results if r.provider in available]
 
