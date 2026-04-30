@@ -332,3 +332,86 @@ async def test_concurrent_acquire_respects_pool_concurrency(loaded_config):
         assert len(manager.musicians[(InstrumentName.CODEX, "gpt-5.4")]) == 2
     finally:
         await manager.stop()
+
+
+@pytest.mark.asyncio()
+async def test_runner_supervisor_resurrects_dead_worker(loaded_config):
+    """Regression: when the runner task dies unexpectedly, the next
+    submit() must respawn it so queued scores still get processed.
+
+    Previously a single unhandled exception in ``Musician._run`` would
+    leave the queue with no consumer; the desktop client would then
+    block forever on ``handle.result_future`` while the symphony
+    ``/musicians`` endpoint reported ``busy=false, queue_length>0``.
+    """
+    manager = Orchestra(loaded_config)
+    await manager.start()
+    try:
+        musician = manager.get_musician(InstrumentName.CLAUDE, "opus")
+        assert musician is not None
+
+        original_task = musician._runner_task
+        assert original_task is not None and not original_task.done()
+
+        # Simulate a silent worker death by cancelling the task without
+        # going through stop(). This is the same end-state we would
+        # observe after an unhandled exception escaped the loop.
+        original_task.cancel()
+        try:
+            await original_task
+        except asyncio.CancelledError:
+            pass
+        assert musician._runner_task is original_task
+        assert musician._runner_task.done()
+
+        # A fresh submit must notice the dead worker, respawn it, and
+        # the score must still complete -- not hang forever.
+        handle = await musician.submit(_new_request(InstrumentName.CLAUDE, "opus"))
+        assert musician._runner_task is not original_task
+        result = await asyncio.wait_for(handle.result_future, timeout=10.0)
+        assert result.exit_code == 0
+    finally:
+        await manager.stop()
+
+
+@pytest.mark.asyncio()
+async def test_runner_survives_unexpected_exception(loaded_config):
+    """A bug in one score's processing must not strand later scores.
+
+    We force ``_dispatch_score`` to raise on the first call. The
+    supervisor's safety net must (1) fail that score so the caller
+    is not left waiting, and (2) keep the loop alive so the next
+    submission still executes.
+    """
+    manager = Orchestra(loaded_config)
+    await manager.start()
+    try:
+        musician = manager.get_musician(InstrumentName.CLAUDE, "opus")
+        assert musician is not None
+        original_task = musician._runner_task
+        original_dispatch = musician._dispatch_score
+        calls = {"count": 0}
+
+        async def flaky_dispatch(request, handle):
+            calls["count"] += 1
+            if calls["count"] == 1:
+                raise RuntimeError("synthetic worker bug")
+            await original_dispatch(request, handle)
+
+        musician._dispatch_score = flaky_dispatch  # type: ignore[assignment]
+
+        bad = await musician.submit(_new_request(InstrumentName.CLAUDE, "opus"))
+        with pytest.raises(Exception):
+            await asyncio.wait_for(bad.result_future, timeout=10.0)
+
+        # Worker must still be the same supervised task -- the safety
+        # net is supposed to catch the bug, not let it kill the loop.
+        assert musician._runner_task is original_task
+        assert not musician._runner_task.done()
+
+        good = await musician.submit(_new_request(InstrumentName.CLAUDE, "opus"))
+        result = await asyncio.wait_for(good.result_future, timeout=10.0)
+        assert result.exit_code == 0
+        assert calls["count"] == 2
+    finally:
+        await manager.stop()
